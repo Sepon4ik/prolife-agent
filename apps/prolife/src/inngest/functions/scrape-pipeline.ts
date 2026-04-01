@@ -97,7 +97,7 @@ export const scrapePipeline = inngest.createFunction(
                   extracted.description?.slice(0, 500),
                 contactEmail: extracted.contactEmails?.[0],
                 contactPhone: extracted.contactPhones?.[0],
-                source: "GOOGLE_SEARCH",
+                source: "GOOGLE",
                 sourceUrl: item.url,
                 hasEcommerce: extracted.hasEcommerce,
                 status: "RAW",
