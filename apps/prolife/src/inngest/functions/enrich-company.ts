@@ -24,22 +24,19 @@ export const enrichCompany = inngest.createFunction(
       });
     });
 
-    // Step 2: Scrape website (if available)
+    // Step 2: Scrape website (if available) — fetch + cheerio
     let websiteContent = "";
     if (company.website) {
       websiteContent = await step.run("scrape-website", async () => {
         try {
-          const { createExhibitionCrawler } = await import("@agency/scraping");
-          const { Dataset } = await import("crawlee");
-
-          const crawler = createExhibitionCrawler({ maxRequests: 5 });
-          await crawler.run([company.website!]);
-
-          const dataset = await Dataset.open();
-          const { items } = await dataset.getData();
-          await dataset.drop();
-
-          return items.map((i: any) => i.text).join("\n").slice(0, 10000);
+          const { crawlPages } = await import("@agency/scraping");
+          const results = await crawlPages([company.website!], {
+            maxRequests: 5,
+          });
+          return results
+            .map((r) => r.text)
+            .join("\n")
+            .slice(0, 10_000);
         } catch (e) {
           console.error(`Failed to scrape ${company.website}:`, e);
           return "";

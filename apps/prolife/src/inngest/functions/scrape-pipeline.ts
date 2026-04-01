@@ -25,25 +25,14 @@ export const scrapePipeline = inngest.createFunction(
       });
     });
 
-    // Step 2: Crawl the source
+    // Step 2: Crawl the source (fetch + cheerio, serverless-compatible)
     const rawData = await step.run("crawl-source", async () => {
-      // Dynamic import to avoid loading Playwright in all routes
-      const { createExhibitionCrawler } = await import("@agency/scraping");
-      const crawler = createExhibitionCrawler({
+      const { crawlPages } = await import("@agency/scraping");
+      const results = await crawlPages([sourceUrl], {
         maxRequests: 100,
         maxConcurrency: 3,
-        proxyUrls: process.env.PROXY_URLS?.split(","),
       });
-
-      await crawler.run([sourceUrl]);
-
-      // Get results from dataset
-      const { Dataset } = await import("crawlee");
-      const dataset = await Dataset.open();
-      const { items } = await dataset.getData();
-      await dataset.drop();
-
-      return items;
+      return results;
     });
 
     // Step 3: Extract and save companies
@@ -52,7 +41,7 @@ export const scrapePipeline = inngest.createFunction(
       let count = 0;
 
       for (const item of rawData) {
-        const extracted = extractExhibitorData(item as any);
+        const extracted = extractExhibitorData(item);
         if (!extracted.name) continue;
 
         try {
