@@ -27,10 +27,18 @@ const sourceTypeIcons: Record<string, string> = {
 export const dynamic = "force-dynamic";
 
 export default async function SourcesPage() {
-  const jobs = await prisma.scrapingJob.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  });
+  let jobs: any[] = [];
+  let dbError: string | null = null;
+
+  try {
+    jobs = await prisma.scrapingJob.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+  } catch (error: any) {
+    dbError = error.message;
+    console.error("Sources DB error:", error);
+  }
 
   const stats = {
     total: jobs.length,
@@ -57,6 +65,13 @@ export default async function SourcesPage() {
         <MiniStat label="Completed" value={stats.completed} />
         <MiniStat label="Companies Found" value={stats.totalFound} />
       </div>
+
+      {dbError && (
+        <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+          <p className="text-red-400 text-sm font-medium">Database Error</p>
+          <p className="text-red-300/70 text-xs mt-1">{dbError}</p>
+        </div>
+      )}
 
       {/* Start scraping form */}
       <div className="mb-8">

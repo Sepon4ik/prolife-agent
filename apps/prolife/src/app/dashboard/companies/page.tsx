@@ -30,14 +30,22 @@ const typeLabels: Record<string, string> = {
 export const dynamic = "force-dynamic";
 
 export default async function CompaniesPage() {
-  const companies = await prisma.company.findMany({
-    include: {
-      contacts: { where: { isPrimary: true }, take: 1 },
-      _count: { select: { emails: true } },
-    },
-    orderBy: [{ priority: "asc" }, { score: "desc" }],
-    take: 100,
-  });
+  let companies: any[] = [];
+  let dbError: string | null = null;
+
+  try {
+    companies = await prisma.company.findMany({
+      include: {
+        contacts: { where: { isPrimary: true }, take: 1 },
+        _count: { select: { emails: true } },
+      },
+      orderBy: [{ priority: "asc" }, { score: "desc" }],
+      take: 100,
+    });
+  } catch (error: any) {
+    dbError = error.message;
+    console.error("Companies DB error:", error);
+  }
 
   const stats = {
     total: companies.length,
@@ -57,6 +65,13 @@ export default async function CompaniesPage() {
         </div>
         <AddCompanyForm />
       </div>
+
+      {dbError && (
+        <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+          <p className="text-red-400 text-sm font-medium">Database Error</p>
+          <p className="text-red-300/70 text-xs mt-1">{dbError}</p>
+        </div>
+      )}
 
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

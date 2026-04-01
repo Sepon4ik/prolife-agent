@@ -21,14 +21,22 @@ const outreachTypeLabels: Record<string, string> = {
 export const dynamic = "force-dynamic";
 
 export default async function OutreachPage() {
-  const emails = await prisma.email.findMany({
-    include: {
-      company: { select: { name: true, country: true, priority: true } },
-      contact: { select: { name: true, email: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  let emails: any[] = [];
+  let dbError: string | null = null;
+
+  try {
+    emails = await prisma.email.findMany({
+      include: {
+        company: { select: { name: true, country: true, priority: true } },
+        contact: { select: { name: true, email: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+  } catch (error: any) {
+    dbError = error.message;
+    console.error("Outreach DB error:", error);
+  }
 
   const stats = {
     total: emails.length,
@@ -68,6 +76,13 @@ export default async function OutreachPage() {
         <MiniStat label="Open Rate" value={`${openRate}%`} highlight />
         <MiniStat label="Reply Rate" value={`${replyRate}%`} highlight />
       </div>
+
+      {dbError && (
+        <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+          <p className="text-red-400 text-sm font-medium">Database Error</p>
+          <p className="text-red-300/70 text-xs mt-1">{dbError}</p>
+        </div>
+      )}
 
       {/* Pipeline funnel */}
       {stats.total > 0 && (
