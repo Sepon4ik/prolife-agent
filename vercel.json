@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm turbo run build --filter=@agency/prolife",
+  "buildCommand": "pnpm turbo run build --filter=@agency/prolife && cp packages/db/generated/client/libquery_engine-rhel-openssl-3.0.x.so.node apps/prolife/.next/server/",
   "installCommand": "pnpm install",
   "framework": "nextjs",
   "outputDirectory": "apps/prolife/.next"
