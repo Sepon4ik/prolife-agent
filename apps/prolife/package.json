@@ -14,6 +14,8 @@
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "@agency/db": "workspace:*",
+    "@prisma/client": "^6.2.0",
+    "prisma": "^6.2.0",
     "@agency/ai": "workspace:*",
     "@agency/email": "workspace:*",
     "@agency/queue": "workspace:*",

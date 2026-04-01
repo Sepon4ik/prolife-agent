@@ -1,10 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  output: "standalone",
+  outputFileTracingRoot: require("path").join(__dirname, "../../"),
   transpilePackages: [
     "@agency/ui",
     "@agency/auth",
-    "@agency/db",
     "@agency/ai",
     "@agency/email",
     "@agency/queue",
