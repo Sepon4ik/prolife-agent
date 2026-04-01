@@ -30,8 +30,6 @@ const nextConfig = {
       // Externalize heavy native packages to prevent webpack resolution errors
       config.externals = [
         ...(Array.isArray(config.externals) ? config.externals : []),
-        "@prisma/client",
-        ".prisma/client",
         "crawlee",
         "playwright",
         "playwright-core",
