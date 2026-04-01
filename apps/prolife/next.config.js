@@ -4,6 +4,7 @@ const nextConfig = {
   transpilePackages: [
     "@agency/ui",
     "@agency/auth",
+    "@agency/db",
     "@agency/ai",
     "@agency/email",
     "@agency/queue",
@@ -12,8 +13,6 @@ const nextConfig = {
   ],
   experimental: {
     serverComponentsExternalPackages: [
-      "@prisma/client",
-      ".prisma/client",
       "crawlee",
       "@crawlee/core",
       "@crawlee/browser",

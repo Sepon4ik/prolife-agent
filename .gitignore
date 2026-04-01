@@ -30,6 +30,7 @@ Thumbs.db
 
 # Prisma
 packages/db/prisma/*.db
+packages/db/generated/
 
 # Debug
 npm-debug.log*
@@ -39,5 +40,3 @@ pnpm-debug.log*
 
 # Crawlee
 storage/
-
-.vercel
