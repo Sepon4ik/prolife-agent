@@ -12,6 +12,7 @@ const sourceTypeLabels: Record<string, string> = {
   EXHIBITION: "Exhibition",
   LINKEDIN: "LinkedIn",
   GOOGLE: "Google",
+  GOOGLE_SEARCH: "Google Search",
   WEBSITE: "Website",
   MANUAL: "Manual",
 };
@@ -20,6 +21,7 @@ const sourceTypeIcons: Record<string, string> = {
   EXHIBITION: "\uD83C\uDFAA",
   LINKEDIN: "\uD83D\uDD17",
   GOOGLE: "\uD83D\uDD0D",
+  GOOGLE_SEARCH: "\uD83D\uDD0D",
   WEBSITE: "\uD83C\uDF10",
   MANUAL: "\u270D\uFE0F",
 };

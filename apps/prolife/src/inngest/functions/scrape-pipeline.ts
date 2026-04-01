@@ -4,8 +4,9 @@ import { prisma } from "@agency/db";
 /**
  * Scrape Pipeline
  * Triggered when a scraping job is started.
- * Crawls exhibition catalogs, extracts exhibitor data,
- * and creates Company records for each found company.
+ * Supports two modes:
+ * - "exhibition": Crawls exhibition pages and extracts exhibitor data
+ * - "google_search": Searches Google for distributors and crawls result pages
  */
 export const scrapePipeline = inngest.createFunction(
   {
@@ -25,52 +26,124 @@ export const scrapePipeline = inngest.createFunction(
       });
     });
 
-    // Step 2: Crawl the source (fetch + cheerio, serverless-compatible)
+    // Step 2: Crawl or Search
     const rawData = await step.run("crawl-source", async () => {
-      const { crawlPages } = await import("@agency/scraping");
-      const results = await crawlPages([sourceUrl], {
-        maxRequests: 100,
-        maxConcurrency: 3,
-      });
-      return results;
+      if (sourceType === "google_search") {
+        // Google Search mode: search query is in sourceUrl field
+        const { searchAndCrawl } = await import("@agency/scraping");
+        const result = await searchAndCrawl(sourceUrl, {
+          maxResults: 20,
+          maxCrawlPages: 15,
+        });
+
+        // Combine search snippets with crawled page data
+        return result.crawledPages.map((page) => {
+          const matchingSearch = result.searchResults.find(
+            (sr) =>
+              page.url.includes(new URL(sr.url).hostname) ||
+              sr.url === page.url
+          );
+          return {
+            ...page,
+            searchSnippet: matchingSearch?.snippet ?? "",
+            searchTitle: matchingSearch?.title ?? "",
+          };
+        });
+      } else {
+        // Exhibition/direct crawl mode
+        const { crawlPages } = await import("@agency/scraping");
+        const results = await crawlPages([sourceUrl], {
+          maxRequests: 100,
+          maxConcurrency: 3,
+        });
+        return results;
+      }
     });
 
     // Step 3: Extract and save companies
     const savedCount = await step.run("extract-and-save", async () => {
-      const { extractExhibitorData } = await import("@agency/scraping");
       let count = 0;
 
-      for (const item of rawData) {
-        const extracted = extractExhibitorData(item);
-        if (!extracted.name) continue;
+      if (sourceType === "google_search") {
+        // For Google search: each crawled page is likely a company website
+        const { extractCompanyWebsite } = await import("@agency/scraping");
 
-        try {
-          await prisma.company.upsert({
-            where: {
-              tenantId_name_country: {
+        for (const item of rawData) {
+          try {
+            const extracted = extractCompanyWebsite(item);
+            // Use page title as company name, cleaned up
+            const name = (item as any).searchTitle ||
+              item.title?.replace(/\s*[-|–].*$/, "").trim();
+            if (!name || name.length < 2) continue;
+
+            // Extract domain as identifier
+            const domain = new URL(item.url).hostname.replace("www.", "");
+
+            await prisma.company.upsert({
+              where: {
+                tenantId_name_country: {
+                  tenantId,
+                  name,
+                  country: sourceName ?? "Unknown",
+                },
+              },
+              create: {
+                tenantId,
+                name,
+                country: sourceName ?? "Unknown",
+                website: `https://${domain}`,
+                description:
+                  (item as any).searchSnippet ||
+                  extracted.description?.slice(0, 500),
+                contactEmail: extracted.contactEmails?.[0],
+                contactPhone: extracted.contactPhones?.[0],
+                source: "GOOGLE_SEARCH",
+                sourceUrl: item.url,
+                hasEcommerce: extracted.hasEcommerce,
+                status: "RAW",
+              },
+              update: {},
+            });
+            count++;
+          } catch (e) {
+            console.error(`Skip ${item.url}:`, e);
+          }
+        }
+      } else {
+        // Exhibition mode: extract exhibitor data
+        const { extractExhibitorData } = await import("@agency/scraping");
+
+        for (const item of rawData) {
+          const extracted = extractExhibitorData(item);
+          if (!extracted.name) continue;
+
+          try {
+            await prisma.company.upsert({
+              where: {
+                tenantId_name_country: {
+                  tenantId,
+                  name: extracted.name,
+                  country: extracted.country ?? "Unknown",
+                },
+              },
+              create: {
                 tenantId,
                 name: extracted.name,
                 country: extracted.country ?? "Unknown",
+                city: extracted.city,
+                website: extracted.website,
+                description: extracted.description,
+                source: sourceType.toUpperCase() as any,
+                sourceUrl,
+                sourceExhibition: sourceName,
+                status: "RAW",
               },
-            },
-            create: {
-              tenantId,
-              name: extracted.name,
-              country: extracted.country ?? "Unknown",
-              city: extracted.city,
-              website: extracted.website,
-              description: extracted.description,
-              source: sourceType.toUpperCase() as any,
-              sourceUrl,
-              sourceExhibition: sourceName,
-              status: "RAW",
-            },
-            update: {},
-          });
-          count++;
-        } catch (e) {
-          // Duplicate or validation error — skip
-          console.error(`Skip ${extracted.name}:`, e);
+              update: {},
+            });
+            count++;
+          } catch (e) {
+            console.error(`Skip ${extracted.name}:`, e);
+          }
         }
       }
 

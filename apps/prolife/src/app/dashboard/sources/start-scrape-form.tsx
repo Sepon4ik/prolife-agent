@@ -11,10 +11,10 @@ const sourceTypes = [
     placeholder: "https://www.cphi.com/exhibitors/list",
   },
   {
-    value: "google",
+    value: "google_search",
     label: "Google Search",
     icon: "\uD83D\uDD0D",
-    placeholder: "https://www.google.com/search?q=pharma+distributors+indonesia",
+    placeholder: "pharmaceutical distributors Germany",
   },
   {
     value: "linkedin",
@@ -115,11 +115,11 @@ export function StartScrapeForm() {
         {/* URL */}
         <div className="md:col-span-2">
           <label className="block text-xs text-gray-400 mb-1.5">
-            Source URL
+            {sourceType === "google_search" ? "Search Query" : "Source URL"}
           </label>
           <div className="flex gap-2">
             <input
-              type="url"
+              type={sourceType === "google_search" ? "text" : "url"}
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
               placeholder={selectedType?.placeholder}
@@ -131,7 +131,11 @@ export function StartScrapeForm() {
               disabled={loading || !sourceUrl}
               className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors whitespace-nowrap"
             >
-              {loading ? "Starting..." : "Start Scraping"}
+              {loading
+                  ? "Starting..."
+                  : sourceType === "google_search"
+                    ? "Search"
+                    : "Start Scraping"}
             </button>
           </div>
         </div>
