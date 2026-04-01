@@ -12,37 +12,6 @@ const nextConfig = {
     "@agency/scraping",
     "@agency/env",
   ],
-  experimental: {
-    serverComponentsExternalPackages: [
-      "crawlee",
-      "@crawlee/core",
-      "@crawlee/browser",
-      "@crawlee/cheerio",
-      "@crawlee/playwright",
-      "@crawlee/puppeteer",
-      "playwright",
-      "playwright-core",
-      "puppeteer",
-    ],
-  },
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      // Externalize heavy native packages to prevent webpack resolution errors
-      config.externals = [
-        ...(Array.isArray(config.externals) ? config.externals : []),
-        "crawlee",
-        "playwright",
-        "playwright-core",
-        "puppeteer",
-        "@crawlee/core",
-        "@crawlee/browser",
-        "@crawlee/cheerio",
-        "@crawlee/playwright",
-        "@crawlee/puppeteer",
-      ];
-    }
-    return config;
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
