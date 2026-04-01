@@ -1,0 +1,37 @@
+{
+  "name": "@agency/prolife",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "@agency/db": "workspace:*",
+    "@agency/ai": "workspace:*",
+    "@agency/email": "workspace:*",
+    "@agency/queue": "workspace:*",
+    "@agency/scraping": "workspace:*",
+    "@agency/auth": "workspace:*",
+    "@agency/ui": "workspace:*",
+    "@agency/env": "workspace:*",
+    "inngest": "^3.27.0",
+    "zod": "^3.23.0",
+    "lucide-react": "^0.468.0",
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0"
+  },
+  "devDependencies": {
+    "@agency/tsconfig": "workspace:*",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ── Enums ──
+
+enum CompanyType {
+  DISTRIBUTOR
+  PHARMACY_CHAIN
+  RETAIL
+  HYBRID
+  UNKNOWN
+}
+
+enum Priority {
+  A
+  B
+  C
+}
+
+enum CompanyStatus {
+  RAW
+  ENRICHED
+  SCORED
+  OUTREACH_SENT
+  REPLIED
+  INTERESTED
+  NOT_INTERESTED
+  HANDED_OFF
+  DISQUALIFIED
+}
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  REPLIED
+  BOUNCED
+  FAILED
+}
+
+enum OutreachType {
+  INITIAL
+  FOLLOW_UP_1
+  FOLLOW_UP_2
+  FOLLOW_UP_3
+}
+
+enum ScrapingSourceType {
+  EXHIBITION
+  LINKEDIN
+  GOOGLE
+  WEBSITE
+  MANUAL
+}
+
+enum GeoPriority {
+  P1
+  P2
+  P3
+}
+
+// ── Models ──
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companies    Company[]
+  scrapingJobs ScrapingJob[]
+  users        User[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  tenantId  String
+  email     String   @unique
+  name      String
+  role      String   @default("member") // admin, sales_director, member
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+model Company {
+  id          String        @id @default(cuid())
+  tenantId    String
+  name        String
+  type        CompanyType   @default(UNKNOWN)
+  country     String
+  city        String?
+  website     String?
+  description String?
+  priority    Priority      @default(C)
+  score       Int           @default(0)
+  status      CompanyStatus @default(RAW)
+  geoPriority GeoPriority?
+
+  // AI enrichment fields
+  categories        String[]  @default([])
+  estimatedRevenue   String?   // under_2m, 2m_10m, 10m_plus, unknown
+  hasEcommerce       Boolean   @default(false)
+  hasSalesTeam       Boolean   @default(false)
+  hasMarketingTeam   Boolean   @default(false)
+  hasMedReps         Boolean   @default(false)
+  portfolioBrands    String[]  @default([])
+  pharmacyCount      Int?      // number of pharmacy outlets if chain
+  activelySeekingBrands Boolean @default(false)
+
+  // Source tracking
+  source     ScrapingSourceType @default(MANUAL)
+  sourceUrl  String?
+  sourceExhibition String?
+
+  contacts  Contact[]
+  emails    Email[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // Soft delete
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, country, priority])
+  @@index([tenantId, type])
+  @@index([tenantId, geoPriority])
+  @@unique([tenantId, name, country])
+}
+
+model Contact {
+  id        String  @id @default(cuid())
+  companyId String
+  name      String
+  title     String? // CEO, Sales Director, etc.
+  email     String?
+  phone     String?
+  linkedin  String?
+  isPrimary Boolean @default(false)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emails  Email[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([email])
+}
+
+model Email {
+  id         String       @id @default(cuid())
+  companyId  String
+  contactId  String?
+  type       OutreachType
+  status     EmailStatus  @default(QUEUED)
+  subject    String
+  body       String
+  sentAt     DateTime?
+  openedAt   DateTime?
+  repliedAt  DateTime?
+  replyBody  String?
+  messageId  String?      // SES/Resend message ID
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@index([type, status])
+}
+
+model ScrapingJob {
+  id         String             @id @default(cuid())
+  tenantId   String
+  sourceType ScrapingSourceType
+  sourceUrl  String
+  sourceName String?            // Exhibition name, etc.
+  status     String             @default("pending") // pending, running, completed, failed
+  totalFound Int                @default(0)
+  totalNew   Int                @default(0)
+  error      String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+}
+
+model WebhookEvent {
+  id         String   @id @default(cuid())
+  externalId String   @unique
+  type       String
+  payload    Json
+  processedAt DateTime
+
+  createdAt DateTime @default(now())
+}

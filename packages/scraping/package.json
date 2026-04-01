@@ -1,0 +1,19 @@
+{
+  "name": "@agency/scraping",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "crawlee": "^3.12.0",
+    "playwright": "^1.49.0",
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "@agency/tsconfig": "workspace:*",
+    "typescript": "^5.7.0"
+  }
+}

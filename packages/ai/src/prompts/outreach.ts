@@ -1,0 +1,67 @@
+import { createAIClient } from "../client";
+
+interface OutreachParams {
+  companyName: string;
+  contactName: string;
+  country: string;
+  companyType: string;
+  categories: string[];
+  language?: string;
+}
+
+const OUTREACH_SYSTEM_PROMPT = `You are writing a professional outreach email on behalf of ProLife, a Swiss company specializing in:
+- Vitamins & dietary supplements
+- Dermo-cosmetics
+- Children's cosmetics & accessories
+- Home medical devices
+
+The email should be:
+- Professional but warm
+- Personalized to the recipient's company and market
+- Brief (150-200 words max)
+- Include a clear call to action (schedule a call)
+- Mention Swiss quality and innovation
+- Reference the recipient's market expertise
+
+Write ONLY the email body. No subject line, no greeting format instructions.`;
+
+export async function generateOutreachEmail(params: OutreachParams): Promise<{
+  subject: string;
+  body: string;
+}> {
+  const ai = createAIClient();
+
+  const body = await ai.generate({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1024,
+    system: OUTREACH_SYSTEM_PROMPT,
+    messages: [
+      {
+        role: "user",
+        content: `Write a personalized outreach email for:
+- Company: ${params.companyName}
+- Contact: ${params.contactName}
+- Country: ${params.country}
+- Company type: ${params.companyType}
+- Their categories: ${params.categories.join(", ")}
+- Language: ${params.language ?? "English"}
+
+The email should feel personal and reference their specific market.`,
+      },
+    ],
+  });
+
+  // Generate subject separately for better quality
+  const subject = await ai.generate({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 100,
+    messages: [
+      {
+        role: "user",
+        content: `Generate a short, compelling email subject line for a B2B outreach email from ProLife (Swiss health products) to ${params.companyName} (${params.companyType} in ${params.country}). Return ONLY the subject line, no quotes.`,
+      },
+    ],
+  });
+
+  return { subject: subject.trim(), body };
+}
