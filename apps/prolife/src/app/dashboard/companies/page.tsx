@@ -1,4 +1,5 @@
 import { prisma } from "@agency/db";
+import { AddCompanyForm } from "./add-company-form";
 
 const statusColors: Record<string, string> = {
   RAW: "bg-gray-500/20 text-gray-300",
@@ -26,6 +27,8 @@ const typeLabels: Record<string, string> = {
   UNKNOWN: "Unknown",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function CompaniesPage() {
   const companies = await prisma.company.findMany({
     include: {
@@ -52,6 +55,7 @@ export default async function CompaniesPage() {
             Discovered distributors and potential partners
           </p>
         </div>
+        <AddCompanyForm />
       </div>
 
       {/* Stats row */}

@@ -1,4 +1,5 @@
 import { prisma } from "@agency/db";
+import { StartScrapeForm } from "./start-scrape-form";
 
 const statusColors: Record<string, string> = {
   pending: "bg-gray-500/20 text-gray-300",
@@ -22,6 +23,8 @@ const sourceTypeIcons: Record<string, string> = {
   WEBSITE: "\uD83C\uDF10",
   MANUAL: "\u270D\uFE0F",
 };
+
+export const dynamic = "force-dynamic";
 
 export default async function SourcesPage() {
   const jobs = await prisma.scrapingJob.findMany({
@@ -55,29 +58,10 @@ export default async function SourcesPage() {
         <MiniStat label="Companies Found" value={stats.totalFound} />
       </div>
 
-      {/* Predefined sources */}
+      {/* Start scraping form */}
       <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-3">Quick Sources</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <SourceCard
-            icon="\uD83C\uDFAA"
-            title="Exhibition Scraper"
-            description="Scrape exhibitor lists from pharma exhibitions (CPhI, Vitafoods, etc.)"
-            tag="EXHIBITION"
-          />
-          <SourceCard
-            icon="\uD83D\uDD0D"
-            title="Google Search"
-            description="Search for distributors by country and product category"
-            tag="GOOGLE"
-          />
-          <SourceCard
-            icon="\uD83D\uDD17"
-            title="LinkedIn Discovery"
-            description="Find pharma distributors via LinkedIn company search"
-            tag="LINKEDIN"
-          />
-        </div>
+        <h2 className="text-lg font-semibold mb-3">Start New Scraping Job</h2>
+        <StartScrapeForm />
       </div>
 
       {/* Jobs table */}
@@ -86,8 +70,7 @@ export default async function SourcesPage() {
         <div className="bg-dark-secondary rounded-lg p-12 border border-white/10 text-center">
           <p className="text-gray-400 text-lg mb-2">No scraping jobs yet</p>
           <p className="text-gray-500 text-sm">
-            Use one of the quick sources above or trigger a scraping job via the
-            API.
+            Use the form above to start your first scraping job.
           </p>
         </div>
       ) : (
@@ -144,7 +127,8 @@ export default async function SourcesPage() {
                       <td className="px-4 py-3">
                         <span
                           className={`inline-block px-2 py-0.5 rounded text-xs ${
-                            statusColors[job.status] || "bg-gray-500/20 text-gray-300"
+                            statusColors[job.status] ||
+                            "bg-gray-500/20 text-gray-300"
                           }`}
                         >
                           {job.status}
@@ -170,25 +154,6 @@ export default async function SourcesPage() {
               </tbody>
             </table>
           </div>
-
-          {/* Error display */}
-          {jobs.some((j) => j.error) && (
-            <div className="border-t border-white/10 p-4">
-              <h3 className="text-sm font-medium text-red-400 mb-2">
-                Errors
-              </h3>
-              {jobs
-                .filter((j) => j.error)
-                .map((j) => (
-                  <div key={j.id} className="text-xs text-red-300/70 mb-1">
-                    <span className="text-gray-500">
-                      {j.sourceName || j.sourceUrl}:
-                    </span>{" "}
-                    {j.error}
-                  </div>
-                ))}
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -200,35 +165,6 @@ function MiniStat({ label, value }: { label: string; value: number }) {
     <div className="bg-dark-secondary rounded-lg px-4 py-3 border border-white/10">
       <p className="text-xs text-gray-400">{label}</p>
       <p className="text-2xl font-bold mt-0.5">{value}</p>
-    </div>
-  );
-}
-
-function SourceCard({
-  icon,
-  title,
-  description,
-  tag,
-}: {
-  icon: string;
-  title: string;
-  description: string;
-  tag: string;
-}) {
-  return (
-    <div className="bg-dark-secondary rounded-lg p-5 border border-white/10 hover:border-primary-600/50 transition-colors cursor-pointer group">
-      <div className="flex items-start gap-3">
-        <span className="text-2xl">{icon}</span>
-        <div>
-          <h3 className="font-medium text-white group-hover:text-primary-400 transition-colors">
-            {title}
-          </h3>
-          <p className="text-xs text-gray-400 mt-1">{description}</p>
-          <span className="inline-block mt-2 text-xs px-2 py-0.5 rounded bg-white/5 text-gray-500">
-            {tag}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

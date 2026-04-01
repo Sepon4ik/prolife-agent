@@ -18,6 +18,8 @@ const outreachTypeLabels: Record<string, string> = {
   FOLLOW_UP_3: "Follow-up 3",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function OutreachPage() {
   const emails = await prisma.email.findMany({
     include: {
