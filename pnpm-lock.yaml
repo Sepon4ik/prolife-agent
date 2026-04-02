@@ -35,6 +35,9 @@ importers:
       '@agency/env':
         specifier: workspace:*
         version: link:../../packages/env
+      '@agency/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@agency/queue':
         specifier: workspace:*
         version: link:../../packages/queue
@@ -164,6 +167,8 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+
+  packages/notifications: {}
 
   packages/queue:
     dependencies:

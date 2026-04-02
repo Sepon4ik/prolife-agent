@@ -7,3 +7,4 @@ export {
   type GoogleSearchResult,
   type SearchAndCrawlResult,
 } from "./google-search";
+export { extractContactPages, findContactPageUrls } from "./extractors/contacts";

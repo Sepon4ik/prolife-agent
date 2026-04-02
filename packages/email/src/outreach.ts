@@ -27,7 +27,7 @@ export async function sendOutreachEmail(
     to: params.to,
     subject: params.subject,
     html: wrapInTemplate(params.body),
-    reply_to: params.replyTo ?? "partnerships@prolife.swiss",
+    replyTo: params.replyTo ?? "partnerships@prolife.swiss",
   });
 
   return {

@@ -6,6 +6,7 @@ import { scoreCompany } from "@/inngest/functions/score-company";
 import { sendOutreach } from "@/inngest/functions/send-outreach";
 import { followUp } from "@/inngest/functions/follow-up";
 import { handleReply } from "@/inngest/functions/handle-reply";
+import { salesHandoff } from "@/inngest/functions/sales-handoff";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -16,5 +17,6 @@ export const { GET, POST, PUT } = serve({
     sendOutreach,
     followUp,
     handleReply,
+    salesHandoff,
   ],
 });

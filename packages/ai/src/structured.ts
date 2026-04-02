@@ -58,7 +58,7 @@ export async function classifyCompany(
       {
         name: "classify_company",
         description: "Classify a company based on website content and available data",
-        input_schema: zodToJsonSchema(CompanyClassificationSchema) as any,
+        input_schema: zodToJsonSchema(CompanyClassificationSchema as any) as any,
       },
     ],
     tool_choice: { type: "tool" as const, name: "classify_company" },

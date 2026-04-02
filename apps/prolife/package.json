@@ -23,6 +23,7 @@
     "@agency/auth": "workspace:*",
     "@agency/ui": "workspace:*",
     "@agency/env": "workspace:*",
+    "@agency/notifications": "workspace:*",
     "inngest": "^3.27.0",
     "zod": "^3.23.0",
     "lucide-react": "^0.468.0",

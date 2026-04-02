@@ -20,9 +20,10 @@ export function createAIClient(apiKey?: string): AIClient {
       const response = await claude.messages.create({
         ...params,
         model: params.model ?? "claude-haiku-4-5-20251001",
-      });
+        stream: false,
+      }) as Anthropic.Message;
 
-      const toolBlock = response.content.find((b) => b.type === "tool_use");
+      const toolBlock = response.content.find((b: any) => b.type === "tool_use");
       if (!toolBlock || toolBlock.type !== "tool_use") {
         throw new Error("No tool_use block in response");
       }
@@ -33,9 +34,10 @@ export function createAIClient(apiKey?: string): AIClient {
       const response = await claude.messages.create({
         ...params,
         model: params.model ?? "claude-sonnet-4-20250514",
-      });
+        stream: false,
+      }) as Anthropic.Message;
 
-      const textBlock = response.content.find((b) => b.type === "text");
+      const textBlock = response.content.find((b: any) => b.type === "text");
       if (!textBlock || textBlock.type !== "text") {
         throw new Error("No text block in response");
       }

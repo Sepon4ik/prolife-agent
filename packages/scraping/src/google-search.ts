@@ -96,7 +96,7 @@ async function googleSearch(
       throw new Error(`SerpAPI error: ${res.status} ${res.statusText}`);
     }
 
-    const data = await res.json();
+    const data: any = await res.json();
     const organicResults = data.organic_results ?? [];
 
     return organicResults.map((r: any) => ({
