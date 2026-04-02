@@ -108,18 +108,15 @@ export const scoreCompany = inngest.createFunction(
       });
     });
 
-    // If priority A or B, trigger outreach prep
-    if (scored.priority !== "C") {
-      await step.sendEvent("trigger-outreach-prep", {
-        name: "prolife/outreach.send",
-        data: {
-          tenantId,
-          companyId,
-          contactId: "", // Will be resolved in outreach function
-          type: "initial",
-        },
-      });
-    }
+    // Auto-outreach disabled — manual trigger only.
+    // When ready to enable: uncomment below or add a tenant-level setting.
+    //
+    // if (scored.priority !== "C") {
+    //   await step.sendEvent("trigger-outreach-prep", {
+    //     name: "prolife/outreach.send",
+    //     data: { tenantId, companyId, contactId: "", type: "initial" },
+    //   });
+    // }
 
     return scored;
   }
