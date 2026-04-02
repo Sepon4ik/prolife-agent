@@ -168,25 +168,59 @@ const selectedMailbox = mailboxes[0]; // Least-used today
 
 **For ProLife Agent:** Use Resend for transactional (welcome emails, notifications) and Google Workspace SMTP for cold outreach sequences.
 
+## Infrastructure Calculator
+
+**Formula:** `Daily email target / 50 per mailbox / 3 mailboxes per domain = domains needed`
+
+| Daily Target | Domains | Mailboxes | Monthly Cost |
+|---|---|---|---|
+| 100-200 | 2 | 6-10 | ~$50 |
+| 500 | 4-5 | 15-25 | ~$150 |
+| 1,000 | 10 | 50 | ~$300 |
+| 5,000 | 50 | 250 | ~$1,200 |
+
+Google Workspace via reseller: $2.50-3/mailbox/month (not $7.20 direct).
+
+## 2025-2026 Enforcement Changes
+
+As of March 2026, Gmail/Yahoo/Outlook **reject** (not just spam-folder) emails from domains without DMARC+DKIM+SPF. This is no longer optional.
+
+**Spam complaint hard limits (enforced):**
+- Gmail: 0.3% = messages rejected, sender ineligible for mitigation
+- Yahoo: 0.3% = deliverability restrictions
+- Outlook: 0.3% = bulk filtering, possible blocking
+
+**Open rate caveat:** Apple Mail Privacy Protection pre-fetches tracking pixels, inflating open rates ~50%. Reply rate is now the true north metric, not open rate.
+
 ## Monitoring & Diagnostics
 
 ### Key Tools
-- **Google Postmaster Tools** — see domain reputation, spam rate, authentication
-- **MXToolbox** — check blacklists, DNS, SMTP
-- **mail-tester.com** — send test email, get deliverability score
-- **GlockApps** — inbox placement testing across providers
+- **Google Postmaster Tools** — Gmail spam rate, domain reputation, authentication (FREE, check daily)
+- **Microsoft SNDS** — Outlook complaint rate, trap hits (FREE, check daily)
+- **MXToolbox** — blacklists, DNS, SPF/DKIM/DMARC validation (FREE, check weekly)
+- **mail-tester.com** — inbox placement score per email (FREE, test before every campaign)
+- **GlockApps** — inbox vs spam placement across providers ($59/mo, test weekly)
 
 ### Alert Thresholds
 ```
-Bounce rate > 5% → PAUSE immediately, clean list
-Spam complaints > 0.3% → PAUSE, review content
+Bounce rate > 3% → PAUSE immediately, re-verify list
+Spam complaints > 0.1% → WARNING, review content
+Spam complaints > 0.3% → STOP, domains at risk of permanent damage
 Delivery rate < 90% → Check DNS, warmup, content
-Open rate < 20% → Check deliverability (not just copy)
+Reply rate < 1% sustained → Review targeting and messaging
 ```
 
 ### Weekly Health Check
 1. Check Google Postmaster for spam rate and domain reputation
-2. Run mail-tester.com test from each sending account
-3. Check MXToolbox for blacklists
-4. Review bounce logs and remove bad addresses
-5. Check warmup engagement ratios
+2. Check Microsoft SNDS for Outlook complaints
+3. Run mail-tester.com test from each sending account
+4. Check MXToolbox for blacklists (scan 100+ lists)
+5. Review bounce logs and remove bad addresses
+6. Verify warmup engagement ratios are healthy
+
+### Domain Retirement Criteria
+- Inbox placement drops below 70%
+- Google Postmaster shows "Bad" reputation
+- Domain appears on Spamhaus or Barracuda blacklists
+- Recovery attempt fails after 60-90 days of warmup-only
+- **Proactive:** Rotate in new domains every 3-6 months before they burn. Keep 20-30% reserve domains warming up.

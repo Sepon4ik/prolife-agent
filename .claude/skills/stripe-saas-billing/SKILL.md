@@ -314,11 +314,38 @@ function PricingCard({ plan, current, onSelect }: {
 }
 ```
 
+## Usage-Based Billing (AI Token Passthrough)
+
+Since Stripe API version `2025-03-31.basil`, metered pricing requires a **Meter**.
+
+```typescript
+// 1. Create a Meter (once)
+const meter = await stripe.billing.meters.create({
+  display_name: "AI Tokens",
+  event_name: "ai_tokens_used",
+  default_aggregation: { formula: "sum" },
+  value_settings: { event_payload_key: "value" },
+});
+
+// 2. Report usage after each AI call
+await stripe.billing.meterEvents.create({
+  event_name: "ai_tokens_used",
+  payload: {
+    stripe_customer_id: tenant.stripeCustomerId,
+    value: String(tokensUsed),
+  },
+});
+```
+
+**Stripe LLM Token Billing (March 2026):** Stripe now supports direct LLM token billing with synced prices for Anthropic models. Set a markup % and Stripe handles price updates.
+
 ## Key Implementation Rules
 
 1. **Never trust client-side plan data.** Always verify subscription status server-side via Stripe API or webhook-synced DB.
-2. **Webhook idempotency.** Store `event.id` and skip duplicates.
+2. **Webhook idempotency.** Store `event.id` and skip duplicates. Use existing `WebhookEvent` model.
 3. **Handle subscription gaps.** Check `stripeCurrentPeriodEnd > now()` before gating features.
 4. **Dunning grace period.** Don't immediately revoke access on failed payment. Give 3-7 days.
-5. **Proration.** Use `proration_behavior: "create_prorations"` for mid-cycle upgrades.
-6. **Test with Stripe CLI:** `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
+5. **Proration.** Use `proration_behavior: "always_invoice"` for upgrades, `"create_prorations"` for downgrades.
+6. **Listen to `invoice.paid`**, not just `checkout.session.completed`. Otherwise users lose access after first billing cycle.
+7. **Test with Stripe CLI:** `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
+8. **Config-based plans** (TypeScript const) over database Plan table — plan limits are checked on every request, in-memory config avoids DB queries.

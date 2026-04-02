@@ -109,7 +109,17 @@ const response = await fetch(url, {
 | **ScraperAPI** | Managed | $49+/mo | Auto-rotate | Simple integration |
 | **Webshare** | Datacenter | $30+/mo | 30K+ | Budget, low-security sites |
 
-**For ProLife (startup phase):** Start without proxies. Add ScraperAPI ($49/mo) if getting blocked. Upgrade to SmartProxy for higher volume.
+**For ProLife (startup phase):** Start without proxies. Add SmartProxy ($50/mo, 5GB) if getting blocked. Upgrade to BrightData for enterprise scale.
+
+## TLS Fingerprinting (JA3/JA4)
+
+Every HTTP client has a unique TLS handshake fingerprint. Anti-bot systems (Cloudflare, DataDome) detect Python/Node.js clients instantly.
+
+**Problem:** Node.js `fetch` has a distinctive JA3 hash ≠ real Chrome.
+**Solution for Node.js:** Use Playwright with stealth (real browser TLS) or proxy through managed services.
+**Solution for Python:** Use `curl_cffi` with `impersonate="chrome"`.
+
+**Key rule:** Match User-Agent to TLS fingerprint. Chrome UA + Python TLS = instant block.
 
 ## AI-Powered Data Extraction
 

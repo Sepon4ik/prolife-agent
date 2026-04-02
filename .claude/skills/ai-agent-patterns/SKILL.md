@@ -3,6 +3,19 @@
 ## When to use
 When designing or building AI-powered autonomous agents, multi-step pipelines, or intelligent automation systems.
 
+## Anthropic's Composable Patterns (Official)
+
+Anthropic recommends 5 workflow patterns + 1 true agent pattern. Philosophy: **simple composable patterns, not monolithic frameworks.**
+
+1. **Prompt Chaining:** Input → LLM A → Gate → LLM B → Output. Fixed sequential steps.
+2. **Routing:** Classifier → Route A/B/C with specialized prompts per category.
+3. **Parallelization:** Input → [LLM A, LLM B, LLM C] → Aggregator. Independent subtasks.
+4. **Orchestrator-Workers:** Orchestrator dynamically spawns workers (unlike parallelization, subtasks NOT pre-defined).
+5. **Evaluator-Optimizer:** Generator → Evaluator → Feedback loop until quality threshold met.
+6. **Autonomous Agent:** True agent loop (see below).
+
+Source: anthropic.com/research/building-effective-agents
+
 ## Core Agent Loop
 
 Every AI agent follows this fundamental pattern:
