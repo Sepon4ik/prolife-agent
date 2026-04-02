@@ -23,11 +23,11 @@ export async function sendOutreachEmail(
   const client = getResend();
 
   const result = await client.emails.send({
-    from: params.from ?? "ProLife Partnership <partnerships@prolife.swiss>",
+    from: params.from ?? "ProLife Partnership <partnerships@prolife-global.net>",
     to: params.to,
     subject: params.subject,
     html: wrapInTemplate(params.body),
-    replyTo: params.replyTo ?? "partnerships@prolife.swiss",
+    replyTo: params.replyTo ?? "partnerships@prolife-global.net",
   });
 
   return {
