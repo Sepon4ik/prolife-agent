@@ -83,33 +83,24 @@ export const sendOutreach = inngest.createFunction(
       return result;
     });
 
-    // Step 4: Schedule follow-up in 5 days
-    if (type === "initial") {
-      await step.sleep("wait-for-reply", "5d");
-
-      // Check if reply received
-      const hasReply = await step.run("check-reply", async () => {
-        const reply = await prisma.email.findFirst({
-          where: {
-            companyId,
-            status: "REPLIED",
-          },
-        });
-        return !!reply;
-      });
-
-      if (!hasReply) {
-        await step.sendEvent("schedule-follow-up", {
-          name: "prolife/outreach.send",
-          data: {
-            tenantId,
-            companyId,
-            contactId: contact.id,
-            type: "follow_up_1",
-          },
-        });
-      }
-    }
+    // Auto follow-up disabled — manual trigger only.
+    // When ready: uncomment to auto-send follow-up after 5 days.
+    //
+    // if (type === "initial") {
+    //   await step.sleep("wait-for-reply", "5d");
+    //   const hasReply = await step.run("check-reply", async () => {
+    //     const reply = await prisma.email.findFirst({
+    //       where: { companyId, status: "REPLIED" },
+    //     });
+    //     return !!reply;
+    //   });
+    //   if (!hasReply) {
+    //     await step.sendEvent("schedule-follow-up", {
+    //       name: "prolife/outreach.send",
+    //       data: { tenantId, companyId, contactId: contact.id, type: "follow_up_1" },
+    //     });
+    //   }
+    // }
 
     return { sent: true, messageId: sent.messageId };
   }
