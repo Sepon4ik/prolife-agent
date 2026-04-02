@@ -182,6 +182,9 @@ export const enrichCompany = inngest.createFunction(
               email: contact.email,
               phone: contact.phone,
               linkedin: contact.linkedin,
+              photoUrl: contact.photoUrl,
+              bio: contact.bio,
+              languages: contact.languages ?? [],
               isPrimary,
             },
           });

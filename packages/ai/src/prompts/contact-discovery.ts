@@ -7,7 +7,10 @@ const ContactSchema = z.object({
   title: z.string().nullable().describe("Job title (CEO, Sales Director, etc.)"),
   email: z.string().nullable().describe("Personal business email (not generic like info@ or support@)"),
   phone: z.string().nullable().describe("Direct phone number if available"),
-  linkedin: z.string().nullable().describe("LinkedIn profile URL if found"),
+  linkedin: z.string().nullable().describe("LinkedIn profile URL if found on the page"),
+  photoUrl: z.string().nullable().describe("URL of the person's photo/avatar if found on the page (must be absolute URL, not relative)"),
+  bio: z.string().nullable().describe("Brief professional bio or description (1-2 sentences) if mentioned on the page"),
+  languages: z.array(z.string()).describe("Languages the person likely speaks based on their name, location, and bio. Always include English. Example: ['English', 'Arabic']"),
 });
 
 const ContactDiscoverySchema = z.object({
@@ -36,7 +39,10 @@ Rules:
 - If you find a generic email and no personal one, still include the contact with email as null
 - Do not fabricate or guess emails — only extract what is explicitly on the page
 - Maximum 5 contacts per company
-- Include LinkedIn profile URLs if found on the page`;
+- Include LinkedIn profile URLs if found on the page
+- Extract photo URLs: look for <img> tags near person's name, team member cards, headshots. Must be absolute URLs (https://...)
+- Bio: extract any brief professional description, education, experience mentioned near the person
+- Languages: infer from person's name origin, company location, and any language mentions. Always include English for business contacts.`;
 
 export async function discoverContacts(
   pageContent: string,

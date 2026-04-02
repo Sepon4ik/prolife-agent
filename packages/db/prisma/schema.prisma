@@ -152,6 +152,9 @@ model Contact {
   email     String?
   phone     String?
   linkedin  String?
+  photoUrl  String? // Avatar/photo URL from company website
+  bio       String? // Brief professional bio
+  languages String[] @default([]) // Languages spoken (for outreach personalization)
   isPrimary Boolean @default(false)
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)

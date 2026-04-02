@@ -347,22 +347,66 @@ export default async function CompanyDetailPage({
             {company.contacts.length === 0 ? (
               <p className="text-gray-600 text-xs">No contacts found yet</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {company.contacts.map((contact) => (
                   <div key={contact.id} className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">{contact.name}</span>
-                      {contact.isPrimary && (
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-primary-500/20 text-primary-400">PRIMARY</span>
+                    <div className="flex items-start gap-3">
+                      {/* Photo */}
+                      {contact.photoUrl ? (
+                        <img
+                          src={contact.photoUrl}
+                          alt={contact.name}
+                          className="w-10 h-10 rounded-full object-cover border border-white/10 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-dark-tertiary flex items-center justify-center shrink-0 border border-white/10">
+                          <span className="text-xs text-gray-500 font-medium">
+                            {contact.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </span>
+                        </div>
                       )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-white">{contact.name}</span>
+                          {contact.isPrimary && (
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-primary-500/20 text-primary-400">PRIMARY</span>
+                          )}
+                        </div>
+                        {contact.title && <div className="text-xs text-gray-500 mt-0.5">{contact.title}</div>}
+
+                        {/* Bio */}
+                        {contact.bio && (
+                          <div className="text-[11px] text-gray-400 mt-1.5 leading-relaxed italic">
+                            &ldquo;{contact.bio}&rdquo;
+                          </div>
+                        )}
+
+                        {/* Contact details */}
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                          {contact.email && (
+                            <span className="text-xs text-gray-400">{contact.email}</span>
+                          )}
+                          {contact.phone && (
+                            <span className="text-xs text-gray-500">{contact.phone}</span>
+                          )}
+                          {contact.linkedin && (
+                            <a href={contact.linkedin} target="_blank" rel="noopener noreferrer"
+                              className="text-xs text-blue-400 hover:text-blue-300">LinkedIn</a>
+                          )}
+                        </div>
+
+                        {/* Languages */}
+                        {contact.languages.length > 0 && (
+                          <div className="flex gap-1 mt-2">
+                            {contact.languages.map((lang) => (
+                              <span key={lang} className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-gray-500">
+                                {lang}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {contact.title && <div className="text-xs text-gray-500 mt-0.5">{contact.title}</div>}
-                    {contact.email && <div className="text-xs text-gray-400 mt-1">{contact.email}</div>}
-                    {contact.phone && <div className="text-xs text-gray-500">{contact.phone}</div>}
-                    {contact.linkedin && (
-                      <a href={contact.linkedin} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-blue-400 hover:text-blue-300 mt-1 block">LinkedIn</a>
-                    )}
                   </div>
                 ))}
               </div>
