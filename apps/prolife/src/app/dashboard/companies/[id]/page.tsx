@@ -305,9 +305,22 @@ export default async function CompanyDetailPage({
                 <div className="pt-2">
                   <span className="text-gray-500 text-xs">Portfolio Brands</span>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {company.portfolioBrands.map((brand) => (
-                      <span key={brand} className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-400">{brand}</span>
-                    ))}
+                    {company.portfolioBrands.map((brand) => {
+                      const brandInfo = (company.portfolioBrandInfo as Record<string, string> | null)?.[brand];
+                      return (
+                        <span
+                          key={brand}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-400 relative group cursor-help"
+                        >
+                          {brand}
+                          {brandInfo && (
+                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-dark text-gray-200 text-[11px] leading-relaxed whitespace-nowrap border border-white/10 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 max-w-[250px] whitespace-normal">
+                              {brandInfo}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}

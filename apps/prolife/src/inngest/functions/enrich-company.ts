@@ -133,6 +133,7 @@ export const enrichCompany = inngest.createFunction(
           hasMedReps: classification.hasMedReps,
           pharmacyCount: classification.pharmacyCount,
           portfolioBrands: classification.portfolioBrands,
+          portfolioBrandInfo: classification.portfolioBrandInfo ?? {},
           activelySeekingBrands: classification.activelySeekingBrands,
           status: "ENRICHED",
         },

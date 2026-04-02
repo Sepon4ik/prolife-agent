@@ -16,6 +16,7 @@ export const CompanyClassificationSchema = z.object({
   hasMedReps: z.boolean().describe("Has medical representatives"),
   pharmacyCount: z.number().nullable().describe("Number of pharmacy outlets if chain"),
   portfolioBrands: z.array(z.string()).describe("Known brand names in portfolio"),
+  portfolioBrandInfo: z.record(z.string(), z.string()).describe("Map of brand name to brief 1-sentence description of what the brand produces/sells. Example: {\"Bubchen\": \"German baby skincare and bath products\"}"),
   activelySeekingBrands: z.boolean().describe("Shows signs of looking for new brands/products"),
   relevanceScore: z.number().min(0).max(100).describe("How relevant is this company for ProLife partnership"),
   confidence: z.number().min(0).max(1).describe("Confidence in the classification"),

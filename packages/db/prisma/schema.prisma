@@ -119,6 +119,7 @@ model Company {
   hasMarketingTeam   Boolean   @default(false)
   hasMedReps         Boolean   @default(false)
   portfolioBrands    String[]  @default([])
+  portfolioBrandInfo Json?     // { "BrandName": "Brief description", ... }
   pharmacyCount      Int?      // number of pharmacy outlets if chain
   activelySeekingBrands Boolean @default(false)
 
