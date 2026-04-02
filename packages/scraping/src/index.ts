@@ -10,3 +10,4 @@ export {
 export { extractContactPages, findContactPageUrls } from "./extractors/contacts";
 export { generateEmailPatterns, findEmailByPattern, verifyEmailSMTP, extractDomain } from "./email-discovery";
 export { hunterFindEmail, hunterDomainSearch, hunterVerifyEmail, hunterCheckCredits } from "./hunter";
+export { getGravatarUrl } from "./gravatar";

@@ -318,7 +318,29 @@ export const enrichCompany = inngest.createFunction(
       }
     });
 
-    // Step 8: Trigger scoring
+    // Step 8: Gravatar photo lookup (free)
+    await step.run("gravatar-photo-lookup", async () => {
+      const { getGravatarUrl } = await import("@agency/scraping");
+
+      const contactsNeedingPhoto = await prisma.contact.findMany({
+        where: { companyId, photoUrl: null, email: { not: null } },
+        select: { id: true, email: true },
+        take: 5,
+      });
+
+      for (const contact of contactsNeedingPhoto) {
+        if (!contact.email) continue;
+        const photoUrl = await getGravatarUrl(contact.email);
+        if (photoUrl) {
+          await prisma.contact.update({
+            where: { id: contact.id },
+            data: { photoUrl },
+          });
+        }
+      }
+    });
+
+    // Step 9: Trigger scoring
     await step.sendEvent("trigger-scoring", {
       name: "prolife/score.calculate",
       data: { tenantId, companyId },
