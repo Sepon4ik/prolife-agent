@@ -192,7 +192,76 @@ export const enrichCompany = inngest.createFunction(
       });
     }
 
-    // Step 7: Trigger scoring
+    // Step 7: Ensure at least one contact with email exists
+    await step.run("ensure-contact-email", async () => {
+      const contactsWithEmail = await prisma.contact.count({
+        where: { companyId, email: { not: null } },
+      });
+
+      if (contactsWithEmail > 0) return; // Already have email contacts
+
+      // Try to find emails from scraped pages
+      const allContacts = await prisma.contact.findMany({
+        where: { companyId },
+        select: { id: true, name: true, email: true },
+      });
+
+      // Extract domain from company website
+      const updatedCompany = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { website: true, name: true },
+      });
+      if (!updatedCompany?.website) return;
+
+      let domain: string;
+      try {
+        domain = new URL(updatedCompany.website).hostname.replace("www.", "");
+      } catch {
+        return;
+      }
+
+      // Generate common email patterns for the domain
+      const genericEmails = [
+        `info@${domain}`,
+        `contact@${domain}`,
+        `sales@${domain}`,
+        `partnerships@${domain}`,
+      ];
+
+      // If we have named contacts without email, try firstname@domain
+      for (const contact of allContacts) {
+        if (contact.email) continue;
+        const firstName = contact.name?.split(" ")[0]?.toLowerCase();
+        if (firstName && firstName !== "<unknown>" && firstName.length > 1) {
+          await prisma.contact.update({
+            where: { id: contact.id },
+            data: { email: `${firstName}@${domain}` },
+          });
+          return; // One is enough
+        }
+      }
+
+      // Fallback: create generic contact with info@domain
+      if (allContacts.length === 0) {
+        await prisma.contact.create({
+          data: {
+            companyId,
+            name: "Partnerships Team",
+            title: "General Inquiry",
+            email: genericEmails[0],
+            isPrimary: true,
+          },
+        });
+      } else {
+        // Update first contact with info@domain
+        await prisma.contact.update({
+          where: { id: allContacts[0].id },
+          data: { email: genericEmails[0] },
+        });
+      }
+    });
+
+    // Step 8: Trigger scoring
     await step.sendEvent("trigger-scoring", {
       name: "prolife/score.calculate",
       data: { tenantId, companyId },
