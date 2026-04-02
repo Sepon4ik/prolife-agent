@@ -192,71 +192,124 @@ export const enrichCompany = inngest.createFunction(
       });
     }
 
-    // Step 7: Ensure at least one contact with email exists
-    await step.run("ensure-contact-email", async () => {
+    // Step 7: Waterfall email discovery
+    await step.run("waterfall-email-discovery", async () => {
       const contactsWithEmail = await prisma.contact.count({
         where: { companyId, email: { not: null } },
       });
-
       if (contactsWithEmail > 0) return; // Already have email contacts
 
-      // Try to find emails from scraped pages
       const allContacts = await prisma.contact.findMany({
         where: { companyId },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, title: true, email: true },
       });
 
-      // Extract domain from company website
       const updatedCompany = await prisma.company.findUnique({
         where: { id: companyId },
         select: { website: true, name: true },
       });
       if (!updatedCompany?.website) return;
 
-      let domain: string;
-      try {
-        domain = new URL(updatedCompany.website).hostname.replace("www.", "");
-      } catch {
-        return;
-      }
+      const { extractDomain, findEmailByPattern, hunterFindEmail, hunterDomainSearch } =
+        await import("@agency/scraping");
 
-      // Generate common email patterns for the domain
-      const genericEmails = [
-        `info@${domain}`,
-        `contact@${domain}`,
-        `sales@${domain}`,
-        `partnerships@${domain}`,
-      ];
+      const domain = extractDomain(updatedCompany.website);
+      if (!domain) return;
 
-      // If we have named contacts without email, try firstname@domain
+      // Level 1: Pattern guessing for named contacts (FREE)
       for (const contact of allContacts) {
         if (contact.email) continue;
-        const firstName = contact.name?.split(" ")[0]?.toLowerCase();
-        if (firstName && firstName !== "<unknown>" && firstName.length > 1) {
+        const parts = contact.name?.split(" ") ?? [];
+        const firstName = parts[0];
+        const lastName = parts.slice(1).join(" ");
+        if (!firstName || firstName === "<UNKNOWN>" || firstName.length < 2) continue;
+
+        const guessedEmail = await findEmailByPattern(
+          firstName,
+          lastName || firstName,
+          domain
+        );
+        if (guessedEmail) {
           await prisma.contact.update({
             where: { id: contact.id },
-            data: { email: `${firstName}@${domain}` },
+            data: { email: guessedEmail },
           });
-          return; // One is enough
+          return; // Found one — enough for outreach
         }
       }
 
-      // Fallback: create generic contact with info@domain
+      // Level 2: Hunter.io domain search ($0.10/lookup)
+      const hunterResult = await hunterDomainSearch(domain);
+      if (hunterResult && hunterResult.emails.length > 0) {
+        // Find the best personal email (decision-maker)
+        const bestEmail = hunterResult.emails
+          .filter((e) => e.type === "personal")
+          .sort((a, b) => b.confidence - a.confidence)[0]
+          ?? hunterResult.emails[0];
+
+        if (bestEmail) {
+          const name = [bestEmail.firstName, bestEmail.lastName]
+            .filter(Boolean)
+            .join(" ") || "Unknown Contact";
+
+          // Update existing contact or create new one
+          if (allContacts.length > 0 && !allContacts[0].email) {
+            await prisma.contact.update({
+              where: { id: allContacts[0].id },
+              data: {
+                email: bestEmail.value,
+                ...(name !== "Unknown Contact" && { name }),
+                ...(bestEmail.position && { title: bestEmail.position }),
+              },
+            });
+          } else {
+            await prisma.contact.create({
+              data: {
+                companyId,
+                name,
+                title: bestEmail.position,
+                email: bestEmail.value,
+                isPrimary: true,
+              },
+            });
+          }
+          return;
+        }
+      }
+
+      // Level 3: Hunter.io email finder for named contacts ($0.10/lookup)
+      for (const contact of allContacts) {
+        if (contact.email) continue;
+        const parts = contact.name?.split(" ") ?? [];
+        const firstName = parts[0];
+        const lastName = parts.slice(1).join(" ");
+        if (!firstName || firstName === "<UNKNOWN>" || !lastName) continue;
+
+        const found = await hunterFindEmail(domain, firstName, lastName);
+        if (found?.email && found.score >= 50) {
+          await prisma.contact.update({
+            where: { id: contact.id },
+            data: { email: found.email },
+          });
+          return;
+        }
+      }
+
+      // Level 4: Fallback — info@domain (FREE)
       if (allContacts.length === 0) {
         await prisma.contact.create({
           data: {
             companyId,
             name: "Partnerships Team",
             title: "General Inquiry",
-            email: genericEmails[0],
+            email: `info@${domain}`,
             isPrimary: true,
           },
         });
       } else {
-        // Update first contact with info@domain
         await prisma.contact.update({
           where: { id: allContacts[0].id },
-          data: { email: genericEmails[0] },
+          data: { email: `info@${domain}` },
         });
       }
     });
