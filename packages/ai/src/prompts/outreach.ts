@@ -23,7 +23,7 @@ The email should be:
 - Mention Swiss quality and innovation
 - Reference the recipient's market expertise
 
-Write ONLY the email body. No subject line, no greeting format instructions.`;
+Write ONLY the email body in PLAIN TEXT. No HTML tags, no formatting. No subject line, no greeting format instructions. Keep it short — 100-150 words max. Write like a human typed it in Gmail, not like a marketing template.`;
 
 export async function generateOutreachEmail(params: OutreachParams): Promise<{
   subject: string;

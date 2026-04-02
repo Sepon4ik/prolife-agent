@@ -22,11 +22,16 @@ export async function sendOutreachEmail(
 ): Promise<{ messageId: string }> {
   const client = getResend();
 
+  // Plain text only — no HTML. Critical for cold email deliverability.
+  // HTML triggers Gmail Promotions/Spam filters on new domains.
+  const plainBody = stripHtml(params.body);
+  const fullBody = `${plainBody}\n\n--\nProLife AG | Swiss Medical Technology\nprolife.swiss`;
+
   const result = await client.emails.send({
     from: params.from ?? "ProLife Partnership <partnerships@prolife-global.net>",
     to: params.to,
     subject: params.subject,
-    html: wrapInTemplate(params.body),
+    text: fullBody,
     replyTo: params.replyTo ?? "partnerships@prolife-global.net",
   });
 
@@ -35,17 +40,16 @@ export async function sendOutreachEmail(
   };
 }
 
-function wrapInTemplate(body: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;">
-  ${body}
-  <br><br>
-  <div style="border-top: 1px solid #eee; padding-top: 16px; font-size: 12px; color: #999;">
-    ProLife AG | Swiss Medical Technology<br>
-    <a href="https://prolife.swiss" style="color: #c41e3a;">prolife.swiss</a>
-  </div>
-</body>
-</html>`;
+function stripHtml(text: string): string {
+  return text
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
