@@ -4,6 +4,9 @@ import { createAIClient } from "./client";
 
 // ── Company Classification Schema ──
 export const CompanyClassificationSchema = z.object({
+  companyName: z.string().describe("Clean company name (not page title, not 'Contact Us', not 'About Us' — the actual business name)"),
+  country: z.string().describe("Country where the company is headquartered (e.g. 'United Arab Emirates', 'Germany'). Determine from address, phone code, domain TLD, or content."),
+  city: z.string().nullable().describe("City where headquarters is located, if mentioned"),
   type: z.enum(["distributor", "pharmacy_chain", "retail", "hybrid", "unknown"]),
   categories: z.array(z.string()).describe("Product categories the company works with"),
   estimatedRevenue: z.enum(["under_2m", "2m_10m", "10m_plus", "unknown"]),

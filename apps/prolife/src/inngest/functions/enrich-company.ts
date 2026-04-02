@@ -103,9 +103,27 @@ export const enrichCompany = inngest.createFunction(
         unknown: "UNKNOWN",
       };
 
+      // Use AI-determined name/country if current ones are bad
+      const cleanName =
+        classification.companyName &&
+        classification.companyName.length > 2 &&
+        !["Contact Us", "About Us", "Home", "Products", "Exhibitor List"].includes(classification.companyName)
+          ? classification.companyName
+          : undefined;
+
+      const cleanCountry =
+        classification.country &&
+        classification.country.length > 1 &&
+        classification.country !== "Unknown"
+          ? classification.country
+          : undefined;
+
       await prisma.company.update({
         where: { id: companyId },
         data: {
+          ...(cleanName && { name: cleanName }),
+          ...(cleanCountry && { country: cleanCountry }),
+          ...(classification.city && { city: classification.city }),
           type: typeMap[classification.type] ?? "UNKNOWN",
           categories: classification.categories,
           estimatedRevenue: classification.estimatedRevenue,
