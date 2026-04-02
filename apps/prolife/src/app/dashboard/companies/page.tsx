@@ -1,5 +1,6 @@
 import { prisma } from "@agency/db";
 import { AddCompanyForm } from "./add-company-form";
+import Link from "next/link";
 
 const statusColors: Record<string, string> = {
   RAW: "bg-gray-500/20 text-gray-300",
@@ -111,12 +112,12 @@ export default async function CompaniesPage() {
                   return (
                     <tr
                       key={company.id}
-                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                      className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3">
-                        <div className="font-medium text-white">
+                        <Link href={`/dashboard/companies/${company.id}`} className="font-medium text-white hover:text-primary-400">
                           {company.name}
-                        </div>
+                        </Link>
                         {company.website && (
                           <a
                             href={company.website}
