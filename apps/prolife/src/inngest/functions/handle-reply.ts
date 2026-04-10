@@ -68,18 +68,21 @@ export const handleReply = inngest.createFunction(
         },
       });
 
-      const statusMap: Record<string, string> = {
+      const statusMap = {
         interested: "INTERESTED",
         not_interested: "NOT_INTERESTED",
         request_info: "REPLIED",
         out_of_office: "OUTREACH_SENT",
         unclear: "REPLIED",
-      };
+      } as const;
+
+      type ReplyIntent = keyof typeof statusMap;
+      const companyStatus = statusMap[intent.intent as ReplyIntent] ?? "REPLIED";
 
       await prisma.company.update({
         where: { id: companyId },
         data: {
-          status: statusMap[intent.intent] as any,
+          status: companyStatus,
         },
       });
     });

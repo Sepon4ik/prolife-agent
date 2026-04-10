@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@agency/db";
 import { getLinkedInUsageStats, LINKEDIN_DAILY_LIMITS } from "@agency/linkedin";
+import { z } from "zod";
+
+const LinkedInAccountSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).max(100),
+  profileUrl: z.string().url().optional(),
+  isWarmedUp: z.boolean().default(false),
+});
 
 /**
  * GET /api/linkedin
@@ -52,15 +60,17 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { email, name, profileUrl, isWarmedUp } = body;
+    const raw = await req.json();
+    const parsed = LinkedInAccountSchema.safeParse(raw);
 
-    if (!email || !name) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "email and name are required" },
+        { error: "Invalid input", details: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
+
+    const { email, name, profileUrl, isWarmedUp } = parsed.data;
 
     let tenant = await prisma.tenant.findFirst();
     if (!tenant) {

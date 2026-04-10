@@ -102,7 +102,7 @@ export const scoreCompany = inngest.createFunction(
         data: {
           score: scored.score,
           priority: scored.priority,
-          geoPriority: scored.geoPriority as any,
+          geoPriority: scored.geoPriority as "P1" | "P2" | "P3" | null,
           status: "SCORED",
         },
       });

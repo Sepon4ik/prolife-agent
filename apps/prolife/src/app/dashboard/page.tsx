@@ -33,10 +33,10 @@ export default async function DashboardPage() {
     // Score distribution
     scoreDistribution: [] as { range: string; count: number; color: string }[],
     // Hot leads
-    hotLeads: [] as any[],
+    hotLeads: [] as { id: string; name: string; score: number; status: string; country: string }[],
     // Activity feed
-    recentEmails: [] as any[],
-    recentJobs: [] as any[],
+    recentEmails: [] as { id: string; status: string; updatedAt: Date; company: { name: string } }[],
+    recentJobs: [] as { id: string; sourceType: string; status: string; totalFound: number; totalNew: number; createdAt: Date }[],
     // Geographic reach
     countryCount: 0,
     topCountries: [] as { country: string; count: number }[],

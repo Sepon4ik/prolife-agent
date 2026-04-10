@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@agency/db";
+import { z } from "zod";
+
+const MailboxInputSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).max(100),
+  domain: z.string().min(3).max(255),
+  provider: z.enum(["resend", "ses"]).default("resend"),
+  apiKey: z.string().optional(),
+  dailyLimit: z.number().int().min(1).max(100).default(40),
+  isWarmedUp: z.boolean().default(false),
+});
 
 /**
  * GET /api/mailboxes
@@ -51,16 +62,17 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { email, name, domain, provider, apiKey, dailyLimit, isWarmedUp } =
-      body;
+    const raw = await req.json();
+    const parsed = MailboxInputSchema.safeParse(raw);
 
-    if (!email || !name || !domain) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "email, name, and domain are required" },
+        { error: "Invalid input", details: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
+
+    const { email, name, domain, provider, apiKey, dailyLimit, isWarmedUp } = parsed.data;
 
     let tenant = await prisma.tenant.findFirst();
     if (!tenant) {

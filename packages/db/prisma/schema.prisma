@@ -81,6 +81,11 @@ model Tenant {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
+
+  // Kill switch: ALL outreach is blocked until explicitly enabled.
+  // Email, LinkedIn, follow-ups — nothing goes out while this is false.
+  outreachEnabled Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

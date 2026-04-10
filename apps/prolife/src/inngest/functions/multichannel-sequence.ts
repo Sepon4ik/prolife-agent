@@ -37,6 +37,19 @@ export const multichannelSequence = inngest.createFunction(
   async ({ event, step }) => {
     const { tenantId, companyId, linkedInAccountId } = event.data;
 
+    // KILL SWITCH: refuse to run if outreach is not enabled
+    await step.run("check-outreach-enabled", async () => {
+      const tenant = await prisma.tenant.findUniqueOrThrow({
+        where: { id: tenantId },
+        select: { outreachEnabled: true },
+      });
+      if (!tenant.outreachEnabled) {
+        throw new Error(
+          "Outreach is disabled for this tenant. Enable it in settings before sending."
+        );
+      }
+    });
+
     // Step 1: Load company + contact data
     const { company, contact } = await step.run("load-data", async () => {
       const company = await prisma.company.findUniqueOrThrow({
@@ -178,16 +191,6 @@ export const multichannelSequence = inngest.createFunction(
           note
         );
 
-        if (result.success) {
-          await prisma.contact.update({
-            where: { id: contact.id },
-            data: {
-              linkedinConnected: true,
-              linkedinConnectedAt: new Date(),
-            },
-          });
-        }
-
         return result;
       });
     }
@@ -204,6 +207,17 @@ export const multichannelSequence = inngest.createFunction(
         });
         if (hasReply) return { skipped: true };
 
+        const initialEmail = await prisma.email.findFirst({
+          where: {
+            companyId,
+            contactId: contact.id,
+            type: "INITIAL",
+            status: "SENT",
+          },
+          orderBy: { sentAt: "desc" },
+          select: { subject: true },
+        });
+
         const email = await generateOutreachEmail({
           companyName: company.name,
           contactName: contact.name,
@@ -211,6 +225,14 @@ export const multichannelSequence = inngest.createFunction(
           companyType: company.type,
           categories: company.categories,
         });
+
+        const threadBaseSubject = initialEmail?.subject ?? email.subject;
+        const followupSubject = threadBaseSubject
+          .trim()
+          .toLowerCase()
+          .startsWith("re:")
+          ? threadBaseSubject
+          : `Re: ${threadBaseSubject}`;
 
         const mailboxResult = await pickMailboxWithStatus(prisma, tenantId);
         const mb =
@@ -235,7 +257,7 @@ export const multichannelSequence = inngest.createFunction(
 
         const result = await sendOutreachEmail({
           to: contact.email!,
-          subject: `Re: ${email.subject}`,
+          subject: followupSubject,
           body: email.body,
           from: `${mb.name} <${mb.email}>`,
           replyTo: mb.email,
@@ -249,7 +271,7 @@ export const multichannelSequence = inngest.createFunction(
             mailboxId: mb.id,
             type: "FOLLOW_UP_1",
             status: "SENT",
-            subject: `Re: ${email.subject}`,
+            subject: followupSubject,
             body: email.body,
             sentAt: new Date(),
             messageId: result.messageId,

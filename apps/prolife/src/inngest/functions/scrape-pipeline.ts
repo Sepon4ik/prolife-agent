@@ -440,7 +440,7 @@ export const scrapePipeline = inngest.createFunction(
                 city: extracted.city,
                 website: extracted.website,
                 description: extracted.description,
-                source: sourceType.toUpperCase() as any,
+                source: "EXHIBITION",
                 sourceUrl,
                 sourceExhibition: sourceName,
                 status: "RAW",

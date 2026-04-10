@@ -22,6 +22,19 @@ export const sendOutreach = inngest.createFunction(
   async ({ event, step }) => {
     const { tenantId, companyId, type } = event.data;
 
+    // KILL SWITCH: refuse to send if outreach is not enabled
+    await step.run("check-outreach-enabled", async () => {
+      const tenant = await prisma.tenant.findUniqueOrThrow({
+        where: { id: tenantId },
+        select: { outreachEnabled: true },
+      });
+      if (!tenant.outreachEnabled) {
+        throw new Error(
+          "Outreach is disabled for this tenant. Enable it in settings before sending."
+        );
+      }
+    });
+
     // Step 1: Get company and contact
     const { company, contact } = await step.run("get-data", async () => {
       const company = await prisma.company.findUniqueOrThrow({
@@ -87,19 +100,21 @@ export const sendOutreach = inngest.createFunction(
         apiKey: mailbox.apiKey ?? undefined,
       });
 
-      const outreachTypeMap: Record<string, string> = {
+      const outreachTypeMap = {
         initial: "INITIAL",
         follow_up_1: "FOLLOW_UP_1",
         follow_up_2: "FOLLOW_UP_2",
         follow_up_3: "FOLLOW_UP_3",
-      };
+      } as const;
+
+      const emailType = outreachTypeMap[type as keyof typeof outreachTypeMap] ?? "INITIAL";
 
       await prisma.email.create({
         data: {
           companyId,
           contactId: contact.id,
           mailboxId: mailbox.id,
-          type: outreachTypeMap[type] as any,
+          type: emailType,
           status: "SENT",
           subject: email.subject,
           body: email.body,

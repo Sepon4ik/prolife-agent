@@ -13,6 +13,17 @@ export const followUp = inngest.createFunction(
   },
   { cron: "0 9 * * 1-5" }, // Mon-Fri at 9:00 AM
   async ({ step }) => {
+    // KILL SWITCH: skip if outreach is disabled
+    const enabled = await step.run("check-outreach-enabled", async () => {
+      const tenant = await prisma.tenant.findFirst({
+        select: { outreachEnabled: true },
+      });
+      return tenant?.outreachEnabled ?? false;
+    });
+    if (!enabled) {
+      return { skipped: true, reason: "Outreach disabled" };
+    }
+
     // Find companies with sent emails but no reply after 5+ days
     const needFollowUp = await step.run("find-companies", async () => {
       const fiveDaysAgo = new Date();

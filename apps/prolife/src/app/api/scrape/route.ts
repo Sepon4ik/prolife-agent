@@ -1,23 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@agency/db";
 import { inngest } from "@agency/queue";
+import { z } from "zod";
+
+const ScrapeInputSchema = z.object({
+  sourceType: z.enum([
+    "google_search", "google_maps", "directory", "trade_registry",
+    "regulatory", "news_intent", "apollo", "exhibition",
+    "linkedin", "website", "manual",
+  ]),
+  sourceUrl: z.string().min(1),
+  sourceName: z.string().optional(),
+});
 
 /**
  * POST /api/scrape
  * Start a new scraping job.
- * Body: { sourceType, sourceUrl, sourceName?, tenantId? }
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { sourceType, sourceUrl, sourceName } = body;
+    const raw = await req.json();
+    const parsed = ScrapeInputSchema.safeParse(raw);
 
-    if (!sourceType || !sourceUrl) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "sourceType and sourceUrl are required" },
+        { error: "Invalid input", details: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
+
+    const { sourceType, sourceUrl, sourceName } = parsed.data;
 
     // For now, use a default tenant. Later: get from auth session.
     let tenant = await prisma.tenant.findFirst();
@@ -50,7 +62,7 @@ export async function POST(req: NextRequest) {
     const job = await prisma.scrapingJob.create({
       data: {
         tenantId: tenant.id,
-        sourceType: dbSourceType as any,
+        sourceType: dbSourceType as "GOOGLE" | "GOOGLE_MAPS" | "DIRECTORY" | "TRADE_REGISTRY" | "REGULATORY" | "NEWS_INTENT" | "APOLLO" | "EXHIBITION" | "LINKEDIN" | "WEBSITE" | "MANUAL",
         sourceUrl,
         sourceName: sourceName || null,
         status: "pending",
@@ -74,12 +86,10 @@ export async function POST(req: NextRequest) {
       jobId: job.id,
       message: "Scraping job started",
     });
-  } catch (error: any) {
-    console.error("Scrape API error:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal server error";
+    console.error("Scrape API error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -94,10 +104,8 @@ export async function GET() {
       take: 20,
     });
     return NextResponse.json({ jobs });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
