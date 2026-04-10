@@ -188,6 +188,9 @@ importers:
       cheerio:
         specifier: ^1.0.0
         version: 1.2.0
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
     devDependencies:
       '@agency/tsconfig':
         specifier: workspace:*

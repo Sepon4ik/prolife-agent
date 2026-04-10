@@ -31,8 +31,20 @@ export async function POST(req: NextRequest) {
     }
 
     // Map source type to Prisma enum
-    const dbSourceType =
-      sourceType === "google_search" ? "GOOGLE" : sourceType.toUpperCase();
+    const sourceTypeMap: Record<string, string> = {
+      google_search: "GOOGLE",
+      google_maps: "GOOGLE_MAPS",
+      directory: "DIRECTORY",
+      trade_registry: "TRADE_REGISTRY",
+      regulatory: "REGULATORY",
+      news_intent: "NEWS_INTENT",
+      apollo: "APOLLO",
+      exhibition: "EXHIBITION",
+      linkedin: "LINKEDIN",
+      website: "WEBSITE",
+      manual: "MANUAL",
+    };
+    const dbSourceType = sourceTypeMap[sourceType.toLowerCase()] ?? sourceType.toUpperCase();
 
     // Create scraping job record
     const job = await prisma.scrapingJob.create({
