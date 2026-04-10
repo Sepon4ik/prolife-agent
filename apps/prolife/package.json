@@ -15,6 +15,7 @@
     "@agency/db": "workspace:*",
     "@agency/email": "workspace:*",
     "@agency/env": "workspace:*",
+    "@agency/intel": "workspace:*",
     "@agency/linkedin": "workspace:*",
     "@agency/notifications": "workspace:*",
     "@agency/queue": "workspace:*",

@@ -94,6 +94,9 @@ model Tenant {
   users            User[]
   mailboxes        Mailbox[]
   linkedInAccounts LinkedInAccount[]
+  topics           Topic[]
+  newsItems        NewsItem[]
+  alerts           Alert[]
 }
 
 model User {
@@ -143,6 +146,7 @@ model Company {
 
   contacts  Contact[]
   emails    Email[]
+  newsItems NewsItem[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -328,4 +332,98 @@ model WebhookEvent {
   processedAt DateTime
 
   createdAt DateTime @default(now())
+}
+
+// ── Intel: Industry News Intelligence ──
+
+enum NewsCategory {
+  CONTRACT        // New distribution deal, partnership
+  EXPANSION       // Company enters new market
+  REGULATORY      // Regulatory approval, policy change
+  MA_FUNDING      // Merger, acquisition, funding round
+  LEADERSHIP      // New executive appointed
+  PRODUCT_LAUNCH  // New product or brand launched
+  TENDER          // Government tender, procurement
+  EVENT           // Exhibition, conference
+  GENERAL         // Other industry news
+}
+
+model Topic {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String   // "Indonesia Pharma", "Supplement Distribution"
+  keywords  String[] // ["pharma distributor indonesia", "supplement import"]
+  countries String[] @default([]) // Filter by country
+  isActive  Boolean  @default(true)
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  newsItems NewsItem[]
+  alerts    Alert[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model NewsItem {
+  id          String       @id @default(cuid())
+  tenantId    String
+  topicId     String?
+  url         String       @unique // Deduplicate by URL
+  title       String
+  source      String       // "Google News", "PharmaBoardroom", etc.
+  publishedAt DateTime?
+  category    NewsCategory @default(GENERAL)
+
+  // AI-generated fields
+  summary     String?      // 2-3 sentence AI summary
+  entities    String[]     @default([]) // Company names mentioned
+  countries   String[]     @default([]) // Countries mentioned
+  sentiment   String?      // positive, negative, neutral
+  relevanceScore Int       @default(0) // 0-100, how relevant to client's niche
+
+  // Link to existing companies in our DB
+  companyId   String?      // If we matched a company
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  topic   Topic?   @relation(fields: [topicId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, category])
+  @@index([tenantId, createdAt])
+  @@index([companyId])
+  @@index([relevanceScore])
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  tenantId  String
+  topicId   String?
+  name      String   // "High-relevance pharma news"
+
+  // Trigger conditions
+  minRelevance  Int      @default(70) // Only alert if relevanceScore >= this
+  categories    String[] @default([]) // Filter by NewsCategory (empty = all)
+  countries     String[] @default([]) // Filter by country (empty = all)
+
+  // Delivery
+  channel   String   @default("email") // email, telegram, slack, webhook
+  target    String   // email address, chat ID, webhook URL
+  isActive  Boolean  @default(true)
+
+  // Tracking
+  lastTriggeredAt DateTime?
+  triggerCount    Int @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  topic  Topic? @relation(fields: [topicId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, isActive])
 }
