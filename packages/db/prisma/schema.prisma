@@ -84,10 +84,11 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  companies    Company[]
-  scrapingJobs ScrapingJob[]
-  users        User[]
-  mailboxes    Mailbox[]
+  companies        Company[]
+  scrapingJobs     ScrapingJob[]
+  users            User[]
+  mailboxes        Mailbox[]
+  linkedInAccounts LinkedInAccount[]
 }
 
 model User {
@@ -164,6 +165,19 @@ model Contact {
   languages String[] @default([]) // Languages spoken (for outreach personalization)
   isPrimary Boolean @default(false)
 
+  // LinkedIn enrichment (from Apollo/PDL)
+  linkedinHeadline  String?  // "VP Sales at Acme Corp"
+  linkedinSeniority String?  // c_suite, vp, director, manager
+  linkedinDepartment String? // sales, business_development, marketing
+
+  // LinkedIn outreach tracking
+  linkedinViewed     Boolean  @default(false)
+  linkedinViewedAt   DateTime?
+  linkedinConnected  Boolean  @default(false)
+  linkedinConnectedAt DateTime?
+  linkedinMessaged   Boolean  @default(false)
+  linkedinMessagedAt DateTime?
+
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   emails  Email[]
 
@@ -172,6 +186,7 @@ model Contact {
 
   @@index([companyId])
   @@index([email])
+  @@index([linkedin])
 }
 
 model Email {
@@ -262,6 +277,42 @@ model Mailbox {
 
   @@unique([tenantId, email])
   @@index([tenantId, isActive])
+}
+
+model LinkedInAccount {
+  id          String   @id @default(cuid())
+  tenantId    String
+  email       String   // LinkedIn login email
+  name        String   // Display name
+  profileUrl  String?  // LinkedIn profile URL
+  provider    String   @default("unipile") // unipile, expandi
+  isActive    Boolean  @default(true)
+  isWarmedUp  Boolean  @default(false)
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id])
+  actions LinkedInAction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, email])
+  @@index([tenantId, isActive])
+}
+
+model LinkedInAction {
+  id               String   @id @default(cuid())
+  accountId        String
+  actionType       String   // profile_view, connection_request, message, inmail
+  targetContactId  String
+  metadata         Json     @default("{}")
+  performedAt      DateTime @default(now())
+
+  account LinkedInAccount @relation(fields: [accountId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([accountId, actionType, performedAt])
+  @@index([targetContactId])
 }
 
 model WebhookEvent {

@@ -1,0 +1,17 @@
+{
+  "name": "@agency/linkedin",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agency/db": "workspace:*"
+  },
+  "devDependencies": {
+    "@agency/tsconfig": "workspace:*",
+    "typescript": "^5.7.0"
+  }
+}

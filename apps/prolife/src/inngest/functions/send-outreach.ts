@@ -1,7 +1,11 @@
 import { inngest } from "@agency/queue";
 import { prisma } from "@agency/db";
 import { generateOutreachEmail } from "@agency/ai";
-import { sendOutreachEmail, pickMailbox, recordMailboxSend } from "@agency/email";
+import {
+  sendOutreachEmail,
+  pickMailboxWithStatus,
+  recordMailboxSend,
+} from "@agency/email";
 
 /**
  * Send Outreach Email
@@ -48,16 +52,26 @@ export const sendOutreach = inngest.createFunction(
 
     // Step 3: Pick mailbox (rotation)
     const mailbox = await step.run("pick-mailbox", async () => {
-      const mb = await pickMailbox(prisma, tenantId);
-      // Fallback to default if no mailboxes configured
-      return mb ?? {
-        id: null as string | null,
-        email: "partnerships@prolife-global.net",
-        name: "ProLife Partnership",
-        domain: "prolife-global.net",
-        provider: "resend",
-        apiKey: null,
-      };
+      const result = await pickMailboxWithStatus(prisma, tenantId);
+      if (result.status === "selected") {
+        return result.mailbox;
+      }
+
+      // Fallback only when no managed mailboxes exist.
+      if (result.status === "no_mailboxes_configured") {
+        return {
+          id: null as string | null,
+          email: "partnerships@prolife-global.net",
+          name: "ProLife Partnership",
+          domain: "prolife-global.net",
+          provider: "resend",
+          apiKey: null,
+        };
+      }
+
+      throw new Error(
+        "All managed mailboxes are unavailable (daily limits reached or unhealthy bounce rate)"
+      );
     });
 
     // Step 4: Send email via selected mailbox

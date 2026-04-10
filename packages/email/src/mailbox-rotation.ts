@@ -24,6 +24,11 @@ export interface MailboxForSending {
   apiKey: string | null;
 }
 
+export type PickMailboxResult =
+  | { status: "selected"; mailbox: MailboxForSending }
+  | { status: "no_mailboxes_configured" }
+  | { status: "all_mailboxes_unavailable" };
+
 /**
  * Pick the next available mailbox for sending.
  * Selection criteria:
@@ -36,6 +41,18 @@ export async function pickMailbox(
   prisma: PrismaClient,
   tenantId: string
 ): Promise<MailboxForSending | null> {
+  const result = await pickMailboxWithStatus(prisma, tenantId);
+  return result.status === "selected" ? result.mailbox : null;
+}
+
+/**
+ * Pick the next available mailbox and return selection status.
+ * Use this to distinguish "no mailboxes configured" from "all unavailable".
+ */
+export async function pickMailboxWithStatus(
+  prisma: PrismaClient,
+  tenantId: string
+): Promise<PickMailboxResult> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -78,6 +95,10 @@ export async function pickMailbox(
     orderBy: { updatedAt: "asc" }, // Least recently used first
   });
 
+  if (mailboxes.length === 0) {
+    return { status: "no_mailboxes_configured" };
+  }
+
   for (const mb of mailboxes) {
     // Skip if over daily limit
     if (mb.sentToday >= mb.dailyLimit) continue;
@@ -89,16 +110,19 @@ export async function pickMailbox(
     }
 
     return {
-      id: mb.id,
-      email: mb.email,
-      name: mb.name,
-      domain: mb.domain,
-      provider: mb.provider,
-      apiKey: mb.apiKey,
+      status: "selected",
+      mailbox: {
+        id: mb.id,
+        email: mb.email,
+        name: mb.name,
+        domain: mb.domain,
+        provider: mb.provider,
+        apiKey: mb.apiKey,
+      },
     };
   }
 
-  return null; // All mailboxes exhausted for today
+  return { status: "all_mailboxes_unavailable" };
 }
 
 /**

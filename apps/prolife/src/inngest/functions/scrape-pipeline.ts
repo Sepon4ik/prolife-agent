@@ -385,7 +385,7 @@ export const scrapePipeline = inngest.createFunction(
               update: {},
             });
 
-            // Save contacts from Apollo
+            // Save contacts from Apollo with LinkedIn enrichment
             for (const person of company.people) {
               try {
                 await prisma.contact.create({
@@ -395,6 +395,11 @@ export const scrapePipeline = inngest.createFunction(
                     title: person.title || undefined,
                     linkedin: person.linkedinUrl || undefined,
                     photoUrl: person.photoUrl || undefined,
+                    linkedinHeadline: person.title
+                      ? `${person.title} at ${person.companyName}`
+                      : undefined,
+                    linkedinSeniority: person.seniority || undefined,
+                    linkedinDepartment: person.department || undefined,
                     isPrimary:
                       person.seniority === "c_suite" ||
                       person.seniority === "owner" ||

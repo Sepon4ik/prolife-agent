@@ -35,6 +35,9 @@ importers:
       '@agency/env':
         specifier: workspace:*
         version: link:../../packages/env
+      '@agency/linkedin':
+        specifier: workspace:*
+        version: link:../../packages/linkedin
       '@agency/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
@@ -163,6 +166,19 @@ importers:
       zod:
         specifier: ^3.23.0
         version: 3.25.76
+    devDependencies:
+      '@agency/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/linkedin:
+    dependencies:
+      '@agency/db':
+        specifier: workspace:*
+        version: link:../db
     devDependencies:
       '@agency/tsconfig':
         specifier: workspace:*

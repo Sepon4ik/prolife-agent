@@ -86,13 +86,15 @@ export async function checkDnsHealth(domain: string): Promise<DnsHealthResult> {
     queryDns(`_dmarc.${domain}`, "TXT"),
     queryDns(domain, "MX"),
     // Check common DKIM selectors
-    Promise.any([
+    Promise.all([
       queryDns(`google._domainkey.${domain}`, "TXT"),
       queryDns(`resend._domainkey.${domain}`, "TXT"),
       queryDns(`default._domainkey.${domain}`, "TXT"),
       queryDns(`selector1._domainkey.${domain}`, "TXT"),
       queryDns(`k1._domainkey.${domain}`, "TXT"),
-    ]).catch(() => [] as string[]),
+    ]).then((selectorResults) =>
+      selectorResults.find((records) => records.length > 0) ?? []
+    ),
   ]);
 
   // SPF check
