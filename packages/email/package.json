@@ -8,6 +8,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@agency/db": "workspace:*",
     "resend": "^4.0.0"
   },
   "devDependencies": {

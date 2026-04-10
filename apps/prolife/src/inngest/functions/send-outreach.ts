@@ -1,7 +1,7 @@
 import { inngest } from "@agency/queue";
 import { prisma } from "@agency/db";
 import { generateOutreachEmail } from "@agency/ai";
-import { sendOutreachEmail } from "@agency/email";
+import { sendOutreachEmail, pickMailbox, recordMailboxSend } from "@agency/email";
 
 /**
  * Send Outreach Email
@@ -46,16 +46,34 @@ export const sendOutreach = inngest.createFunction(
       });
     });
 
-    // Step 3: Send email
+    // Step 3: Pick mailbox (rotation)
+    const mailbox = await step.run("pick-mailbox", async () => {
+      const mb = await pickMailbox(prisma, tenantId);
+      // Fallback to default if no mailboxes configured
+      return mb ?? {
+        id: null as string | null,
+        email: "partnerships@prolife-global.net",
+        name: "ProLife Partnership",
+        domain: "prolife-global.net",
+        provider: "resend",
+        apiKey: null,
+      };
+    });
+
+    // Step 4: Send email via selected mailbox
     const sent = await step.run("send-email", async () => {
+      const fromAddress = `${mailbox.name} <${mailbox.email}>`;
+
       const result = await sendOutreachEmail({
         to: contact.email!,
         subject: email.subject,
         body: email.body,
+        from: fromAddress,
+        replyTo: mailbox.email,
+        apiKey: mailbox.apiKey ?? undefined,
       });
 
-      // Save to DB
-      const outreachTypeMap: Record<string, any> = {
+      const outreachTypeMap: Record<string, string> = {
         initial: "INITIAL",
         follow_up_1: "FOLLOW_UP_1",
         follow_up_2: "FOLLOW_UP_2",
@@ -66,7 +84,8 @@ export const sendOutreach = inngest.createFunction(
         data: {
           companyId,
           contactId: contact.id,
-          type: outreachTypeMap[type],
+          mailboxId: mailbox.id,
+          type: outreachTypeMap[type] as any,
           status: "SENT",
           subject: email.subject,
           body: email.body,
@@ -74,6 +93,11 @@ export const sendOutreach = inngest.createFunction(
           messageId: result.messageId,
         },
       });
+
+      // Update mailbox send counter
+      if (mailbox.id) {
+        await recordMailboxSend(prisma, mailbox.id);
+      }
 
       await prisma.company.update({
         where: { id: companyId },

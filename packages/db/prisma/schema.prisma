@@ -87,6 +87,7 @@ model Tenant {
   companies    Company[]
   scrapingJobs ScrapingJob[]
   users        User[]
+  mailboxes    Mailbox[]
 }
 
 model User {
@@ -177,6 +178,7 @@ model Email {
   id         String       @id @default(cuid())
   companyId  String
   contactId  String?
+  mailboxId  String?
   type       OutreachType
   status     EmailStatus  @default(QUEUED)
   subject    String
@@ -186,9 +188,11 @@ model Email {
   repliedAt  DateTime?
   replyBody  String?
   messageId  String?      // SES/Resend message ID
+  variant    String?      // A/B test variant ("A", "B")
 
   company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   contact Contact? @relation(fields: [contactId], references: [id])
+  mailbox Mailbox? @relation(fields: [mailboxId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -196,6 +200,7 @@ model Email {
   @@index([companyId])
   @@index([status])
   @@index([type, status])
+  @@index([mailboxId])
 }
 
 model ScrapingJob {
@@ -217,6 +222,46 @@ model ScrapingJob {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, status])
+}
+
+model Mailbox {
+  id        String   @id @default(cuid())
+  tenantId  String
+  email     String   // e.g. partnerships@prolife-global.net
+  name      String   // Display name: "ProLife Partnership"
+  domain    String   // prolife-global.net
+  provider  String   @default("resend") // resend, ses
+  apiKey    String?  // Provider-specific API key (encrypted in prod)
+  isActive  Boolean  @default(true)
+  isWarmedUp Boolean @default(false)
+
+  // Daily sending limits
+  dailyLimit    Int @default(40)
+  sentToday     Int @default(0)
+  sentTodayDate DateTime? // Reset counter when date changes
+
+  // Health metrics (updated by webhook events)
+  totalSent     Int @default(0)
+  totalDelivered Int @default(0)
+  totalOpened   Int @default(0)
+  totalBounced  Int @default(0)
+  totalReplied  Int @default(0)
+  totalComplained Int @default(0)
+
+  // DNS health (checked periodically)
+  hasSPF    Boolean @default(false)
+  hasDKIM   Boolean @default(false)
+  hasDMARC  Boolean @default(false)
+  lastDnsCheck DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  emails Email[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, email])
+  @@index([tenantId, isActive])
 }
 
 model WebhookEvent {

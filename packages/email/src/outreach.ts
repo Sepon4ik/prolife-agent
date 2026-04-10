@@ -15,12 +15,15 @@ interface OutreachEmailParams {
   body: string;
   from?: string;
   replyTo?: string;
+  /** Override Resend API key (for multi-mailbox rotation) */
+  apiKey?: string;
 }
 
 export async function sendOutreachEmail(
   params: OutreachEmailParams
 ): Promise<{ messageId: string }> {
-  const client = getResend();
+  // Use per-mailbox API key if provided, otherwise default
+  const client = params.apiKey ? new Resend(params.apiKey) : getResend();
 
   // Plain text only — no HTML. Critical for cold email deliverability.
   // HTML triggers Gmail Promotions/Spam filters on new domains.
