@@ -266,3 +266,38 @@ Alert when:
 - Block rate > 20% → switch proxy provider or add delays
 - Success rate < 80% → site may have changed structure
 - Data yield drops → extraction logic may need updating
+
+---
+
+## Recommended open-source tools (researched 2026-04-09)
+
+### Web data extraction
+
+| Repo | Stars | Best for | Integrates with ProLife? |
+|---|---|---|---|
+| **firecrawl/firecrawl** | 106k | URL → clean markdown/structured data for AI. Best for feeding company pages to enrichment. | Yes — REST API, call from Inngest steps |
+| **ScrapeGraphAI/Scrapegraph-ai** | 23k | LLM-powered scraping: give URL, get structured JSON. No selectors needed. | Python only — use as microservice or via API |
+| **jina-ai/reader** | 10.5k | Prefix any URL with `r.jina.ai/` to get LLM-friendly text. Zero setup. | Yes — simple fetch, no SDK needed |
+
+### Browser automation for scraping
+
+| Repo | Stars | Best for | When to use |
+|---|---|---|---|
+| **apify/crawlee** | 23k | Node.js crawling framework. Playwright + Cheerio + proxy rotation + request queue. | Complex multi-page crawls. ProLife's stack is Node, so this fits. |
+| **browser-use/browser-use** | 87k | AI agent that browses websites autonomously. | Lead research on company sites — let AI navigate and extract. |
+| **stagehand-ai/stagehand** | ~13k | Playwright-based browser automation for AI agents. | When you need Playwright reliability + AI flexibility. |
+
+### Anti-detection
+
+| Repo | Stars | What it does |
+|---|---|---|
+| **nicedayzhu/camofox-browser** | 1.3k | Headless anti-detect browser. Randomized fingerprints. | For sites with aggressive bot detection. |
+
+### Usage recommendation for ProLife
+```
+Simple company pages → fetch + cheerio (current, keep)
+JS-heavy SPAs → crawlee with Playwright
+AI extraction needed → firecrawl API or jina reader
+Lead research → browser-use (autonomous browsing)
+Anti-bot sites → crawlee + proxy rotation (SmartProxy)
+```

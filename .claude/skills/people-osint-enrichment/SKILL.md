@@ -724,3 +724,63 @@ Given a target company domain, here is the full sequence to find and enrich deci
 - [theHarvester](https://github.com/laramies/theHarvester)
 - [Recon-ng](https://github.com/lanmaster53/recon-ng)
 - [Maltego](https://www.maltego.com/)
+
+---
+
+## 9. BROWSER AUTOMATION FOR LEAD RESEARCH (added 2026-04-09)
+
+### AI-Powered Browser Agents
+
+| Repo | Stars | Best for |
+|---|---|---|
+| **browser-use/browser-use** | 87k | #1 choice. AI agent that navigates websites autonomously — research company pages, find decision makers, extract contact info. |
+| **stagehand-ai/stagehand** | ~13k | Playwright-based, designed for AI agents. More controlled than browser-use. |
+| **Skyvern-AI/skyvern** | 21k | Visual browser automation. Good for complex forms, data extraction from portals. |
+
+### OSINT username tools (enhanced)
+
+| Repo | Stars | Advantage over Sherlock |
+|---|---|---|
+| **soxoj/maigret** | 19k | 3000+ sites (7x Sherlock). Parses profiles, extracts names/locations/links. Recursive search. Already listed in section 2.1 but deserves emphasis — **this is the go-to for B2B lead username research**. |
+
+### Deep research for prospect intel
+
+| Repo | Stars | Use case |
+|---|---|---|
+| **assafelovic/gpt-researcher** | 26.3k | "Research everything about company X" — produces structured report with sources. |
+| **dzhng/deep-research** | 18.7k | Simpler version. Easy to fork and customize for ProLife's specific research questions. |
+
+### Integration pattern for ProLife
+
+```typescript
+// Before outreach: automated prospect research
+export const researchProspect = inngest.createFunction(
+  { id: "research-prospect", throttle: { limit: 2, period: "1m" } },
+  { event: "prolife/prospect.research" },
+  async ({ event, step }) => {
+    const { companyDomain, contactName } = event.data;
+    
+    // Step 1: Scrape company website (firecrawl)
+    const companyData = await step.run("scrape-company", () =>
+      firecrawlScrape(companyDomain)
+    );
+    
+    // Step 2: Username search (maigret-style)
+    const socialProfiles = await step.run("find-socials", () =>
+      findSocialProfiles(contactName, companyDomain)
+    );
+    
+    // Step 3: Enrich via waterfall (existing pattern)
+    const enriched = await step.run("enrich", () =>
+      runWaterfall({ name: contactName, domain: companyDomain }, providers, requiredFields)
+    );
+    
+    // Step 4: AI synthesis
+    const briefing = await step.run("synthesize", () =>
+      generateProspectBriefing(companyData, socialProfiles, enriched)
+    );
+    
+    return briefing; // Used to personalize outreach
+  }
+);
+```

@@ -215,3 +215,55 @@ if (classification.confidence < 0.5) {
 - **Expensive model for simple tasks:** Don't use Opus to extract an email from HTML
 - **No cost tracking:** Log token usage per call. Set alerts on daily spend.
 - **Synchronous chains:** Don't wait for enrichment to finish before starting the next scrape. Use event-driven async.
+
+---
+
+## Recommended Agent Frameworks (researched 2026-04-09)
+
+### TypeScript-first (fits ProLife stack)
+
+| Repo | Stars | Best for | Stack fit |
+|---|---|---|---|
+| **mastra-ai/mastra** | 23k | TS-first agent framework from Gatsby team. Tools, workflows, RAG, memory built-in. | Perfect — TS, modern, production-ready |
+| **vercel/ai** | 23k | AI SDK for Next.js. Streaming, tool use, structured output, multi-provider. | Already fits — Next.js native |
+| **langchain-ai/langgraph** | 29k | Stateful graphs for agent workflows. Model outreach sequences as graph nodes. | Good — JS/TS SDK available |
+
+### Python (for research/prototyping)
+
+| Repo | Stars | Best for |
+|---|---|---|
+| **crewAIInc/crewAI** | 48k | Multi-agent crews: researcher + enricher + writer. Role-based. |
+| **pydantic/pydantic-ai** | 16k | Structured outputs, type-safe agents. Pydantic way. |
+| **microsoft/autogen** | 57k | Multi-agent conversations with handoffs. |
+
+### Architecture references (read, don't install)
+
+| Repo | Stars | What to learn |
+|---|---|---|
+| **humanlayer/12-factor-agents** | 19k | 12 principles for production LLM software. Read once, internalize. |
+| **langgenius/dify** | 137k | Visual agent builder. Study how they structure agent workflows. |
+
+### Multi-agent orchestration
+
+| Repo | Stars | When to consider |
+|---|---|---|
+| **FlowiseAI/Flowise** | 52k | Visual agent builder. Good for prototyping agent workflows before coding in Inngest. |
+| **n8n-io/n8n** | 183k | Workflow automation with 400+ integrations. Prototype outreach pipelines visually. |
+| **triggerdotdev/trigger.dev** | 14k | Managed agent workflows. Alternative/complement to Inngest with more agent focus. |
+
+### CRM with agent-first architecture
+
+| Repo | Stars | Why study it |
+|---|---|---|
+| **twentyhq/twenty** | 44k | Open-source CRM. Study their data model for pipeline/deal management. |
+| **relaticle/relaticle** | 1.2k | CRM with 30 MCP tools. Study agent-CRM integration patterns. |
+
+### Recommendation for ProLife
+
+```
+Current:  Inngest (event-driven steps) — keep, it works
+Add:      Vercel AI SDK — for streaming + tool use in the Next.js app
+Consider: Mastra — if you need a full agent runtime beyond Inngest steps
+Study:    12-factor-agents — read the principles, apply to ProLife architecture
+Skip:     LangChain/CrewAI — Python, adds complexity without clear benefit for TS stack
+```
