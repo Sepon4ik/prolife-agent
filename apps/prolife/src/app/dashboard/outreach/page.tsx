@@ -1,52 +1,64 @@
 import { prisma } from "@agency/db";
-
-const emailStatusColors: Record<string, string> = {
-  QUEUED: "bg-gray-500/20 text-gray-300",
-  SENT: "bg-blue-500/20 text-blue-300",
-  DELIVERED: "bg-cyan-500/20 text-cyan-300",
-  OPENED: "bg-purple-500/20 text-purple-300",
-  CLICKED: "bg-indigo-500/20 text-indigo-300",
-  REPLIED: "bg-green-500/20 text-green-300",
-  BOUNCED: "bg-orange-500/20 text-orange-300",
-  FAILED: "bg-red-500/20 text-red-300",
-};
-
-const outreachTypeLabels: Record<string, string> = {
-  INITIAL: "Initial",
-  FOLLOW_UP_1: "Follow-up 1",
-  FOLLOW_UP_2: "Follow-up 2",
-  FOLLOW_UP_3: "Follow-up 3",
-};
+import {
+  KpiCard,
+  Card,
+  StatusBadge,
+  EmptyState,
+  timeAgo,
+} from "@agency/ui";
+import {
+  Mail,
+  Send,
+  Eye,
+  MessageSquare,
+  BarChart3,
+  Percent,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function OutreachPage() {
-  let emails: any[] = [];
+  let emails: {
+    id: string;
+    type: string;
+    subject: string | null;
+    status: string;
+    sentAt: Date | null;
+    openedAt: Date | null;
+    repliedAt: Date | null;
+    company: { name: string; country: string; priority: string };
+    contact: { name: string; email: string | null } | null;
+  }[] = [];
   let dbError: string | null = null;
 
   try {
     emails = await prisma.email.findMany({
-      include: {
+      select: {
+        id: true,
+        type: true,
+        subject: true,
+        status: true,
+        sentAt: true,
+        openedAt: true,
+        repliedAt: true,
         company: { select: { name: true, country: true, priority: true } },
         contact: { select: { name: true, email: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-  } catch (error: any) {
-    dbError = error.message;
+  } catch (error: unknown) {
+    dbError = error instanceof Error ? error.message : "Unknown error";
     console.error("Outreach DB error:", error);
   }
 
   const stats = {
     total: emails.length,
-    sent: emails.filter((e) => e.status !== "QUEUED" && e.status !== "FAILED")
-      .length,
-    opened: emails.filter(
-      (e) =>
-        e.status === "OPENED" ||
-        e.status === "CLICKED" ||
-        e.status === "REPLIED"
+    sent: emails.filter(
+      (e) => e.status !== "QUEUED" && e.status !== "FAILED"
+    ).length,
+    opened: emails.filter((e) =>
+      ["OPENED", "CLICKED", "REPLIED"].includes(e.status)
     ).length,
     replied: emails.filter((e) => e.status === "REPLIED").length,
   };
@@ -56,177 +68,169 @@ export default async function OutreachPage() {
   const replyRate =
     stats.sent > 0 ? Math.round((stats.replied / stats.sent) * 100) : 0;
 
-  return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Outreach</h1>
-          <p className="text-gray-400 text-sm mt-1">
-            Email campaigns and follow-up tracking
-          </p>
-        </div>
-      </div>
+  const outreachTypeLabels: Record<string, string> = {
+    INITIAL: "Initial",
+    FOLLOW_UP_1: "Follow-up 1",
+    FOLLOW_UP_2: "Follow-up 2",
+    FOLLOW_UP_3: "Follow-up 3",
+  };
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
-        <MiniStat label="Total Emails" value={String(stats.total)} />
-        <MiniStat label="Sent" value={String(stats.sent)} />
-        <MiniStat label="Opened" value={String(stats.opened)} />
-        <MiniStat label="Replied" value={String(stats.replied)} />
-        <MiniStat label="Open Rate" value={`${openRate}%`} highlight />
-        <MiniStat label="Reply Rate" value={`${replyRate}%`} highlight />
+  return (
+    <div className="p-6 lg:p-8 max-w-[1400px]">
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-white">Рассылка</h1>
+        <p className="text-gray-500 text-xs mt-0.5">
+          Кампании и отслеживание фоллоу-апов
+        </p>
       </div>
 
       {dbError && (
         <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-          <p className="text-red-400 text-sm font-medium">Database Error</p>
+          <p className="text-red-400 text-sm font-medium">Ошибка базы данных</p>
           <p className="text-red-300/70 text-xs mt-1">{dbError}</p>
         </div>
       )}
 
-      {/* Pipeline funnel */}
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <KpiCard
+          title="Всего"
+          value={stats.total}
+          icon={<Mail className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="Отправлено"
+          value={stats.sent}
+          icon={<Send className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="Прочитано"
+          value={stats.opened}
+          icon={<Eye className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="Ответили"
+          value={stats.replied}
+          icon={<MessageSquare className="w-4 h-4" />}
+        />
+        <KpiCard
+          title="Открываемость"
+          value={`${openRate}%`}
+          icon={<BarChart3 className="w-4 h-4" />}
+          subtitleColor={openRate >= 30 ? "text-green-400" : "text-gray-500"}
+          subtitle={openRate >= 30 ? "Хорошо" : openRate >= 15 ? "Средне" : "Низко"}
+        />
+        <KpiCard
+          title="Ответы"
+          value={`${replyRate}%`}
+          icon={<Percent className="w-4 h-4" />}
+          subtitleColor={replyRate >= 10 ? "text-green-400" : "text-gray-500"}
+          subtitle={replyRate >= 10 ? "Выше среднего" : replyRate >= 5 ? "Средне" : "Ниже среднего"}
+        />
+      </div>
+
+      {/* Funnel */}
       {stats.total > 0 && (
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-3">Pipeline Funnel</h2>
-          <div className="bg-dark-secondary rounded-lg p-5 border border-white/10">
-            <div className="flex items-end gap-3 h-24">
+        <Card className="mb-6">
+          <div className="p-5">
+            <h2 className="text-sm font-semibold text-white mb-4">Воронка рассылки</h2>
+            <div className="flex items-end gap-4 h-28">
               <FunnelBar
-                label="Sent"
+                label="Отправлено"
                 count={stats.sent}
                 total={stats.total}
                 color="bg-blue-500"
               />
               <FunnelBar
-                label="Opened"
+                label="Прочитано"
                 count={stats.opened}
                 total={stats.total}
                 color="bg-purple-500"
               />
               <FunnelBar
-                label="Replied"
+                label="Ответили"
                 count={stats.replied}
                 total={stats.total}
                 color="bg-green-500"
               />
             </div>
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Emails table */}
+      {/* Table */}
       {emails.length === 0 ? (
-        <div className="bg-dark-secondary rounded-lg p-12 border border-white/10 text-center">
-          <p className="text-gray-400 text-lg mb-2">No outreach emails yet</p>
-          <p className="text-gray-500 text-sm">
-            Emails will be sent automatically once companies are scored as
-            Priority A or B.
-          </p>
-        </div>
+        <Card>
+          <EmptyState
+            icon={<Mail className="w-10 h-10" />}
+            title="Писем пока нет"
+            description="Письма будут отправлены автоматически компаниям с приоритетом A или B."
+          />
+        </Card>
       ) : (
-        <div className="bg-dark-secondary rounded-lg border border-white/10 overflow-hidden">
+        <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-gray-400 text-left">
-                  <th className="px-4 py-3 font-medium">Company</th>
-                  <th className="px-4 py-3 font-medium">Contact</th>
-                  <th className="px-4 py-3 font-medium">Type</th>
-                  <th className="px-4 py-3 font-medium">Subject</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Sent</th>
-                  <th className="px-4 py-3 font-medium">Opened</th>
-                  <th className="px-4 py-3 font-medium">Replied</th>
+                <tr className="border-b border-white/5 text-gray-500 text-left text-xs">
+                  <th className="px-5 py-3 font-medium">Компания</th>
+                  <th className="px-4 py-3 font-medium">Тип</th>
+                  <th className="px-4 py-3 font-medium">Тема</th>
+                  <th className="px-4 py-3 font-medium">Статус</th>
+                  <th className="px-4 py-3 font-medium text-right">Хронология</th>
                 </tr>
               </thead>
               <tbody>
                 {emails.map((email) => (
                   <tr
                     key={email.id}
-                    className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                    className="border-b border-white/[0.03] hover:bg-white/[0.03] transition-colors"
                   >
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-white">
+                    <td className="px-5 py-3">
+                      <div className="text-sm font-medium text-white">
                         {email.company.name}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {email.company.country}
+                        {email.contact
+                          ? `${email.contact.name} · ${email.contact.email}`
+                          : email.company.country}
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-300 text-xs">
-                      {email.contact ? (
-                        <div>
-                          <div>{email.contact.name}</div>
-                          <div className="text-gray-500">
-                            {email.contact.email}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-500">--</span>
-                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-xs text-gray-400">
-                        {outreachTypeLabels[email.type]}
+                        {outreachTypeLabels[email.type] ?? email.type}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-300 text-xs max-w-[200px] truncate">
+                    <td className="px-4 py-3 text-gray-300 text-xs max-w-[250px] truncate">
                       {email.subject}
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-xs ${
-                          emailStatusColors[email.status] ||
-                          "bg-gray-500/20 text-gray-300"
-                        }`}
-                      >
-                        {email.status}
-                      </span>
+                      <StatusBadge status={email.status} />
                     </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">
-                      {email.sentAt
-                        ? new Date(email.sentAt).toLocaleDateString()
-                        : "--"}
-                    </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">
-                      {email.openedAt
-                        ? new Date(email.openedAt).toLocaleDateString()
-                        : "--"}
-                    </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">
-                      {email.repliedAt
-                        ? new Date(email.repliedAt).toLocaleDateString()
-                        : "--"}
+                    <td className="px-4 py-3 text-right">
+                      <div className="text-[10px] text-gray-500 space-y-0.5 tabular-nums">
+                        {email.sentAt && (
+                          <div>Отправлено {timeAgo(new Date(email.sentAt))}</div>
+                        )}
+                        {email.openedAt && (
+                          <div className="text-purple-400">
+                            Прочитано {timeAgo(new Date(email.openedAt))}
+                          </div>
+                        )}
+                        {email.repliedAt && (
+                          <div className="text-green-400">
+                            Ответ {timeAgo(new Date(email.repliedAt))}
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
-    </div>
-  );
-}
-
-function MiniStat({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div className="bg-dark-secondary rounded-lg px-4 py-3 border border-white/10">
-      <p className="text-xs text-gray-400">{label}</p>
-      <p
-        className={`text-2xl font-bold mt-0.5 ${
-          highlight ? "text-primary-400" : ""
-        }`}
-      >
-        {value}
-      </p>
     </div>
   );
 }
@@ -244,10 +248,10 @@ function FunnelBar({
 }) {
   const pct = total > 0 ? Math.max((count / total) * 100, 4) : 4;
   return (
-    <div className="flex-1 flex flex-col items-center gap-1">
-      <span className="text-xs text-gray-400">{count}</span>
+    <div className="flex-1 flex flex-col items-center gap-1.5">
+      <span className="text-xs font-medium text-white tabular-nums">{count}</span>
       <div
-        className={`w-full ${color} rounded-t`}
+        className={`w-full ${color} rounded-t opacity-80`}
         style={{ height: `${pct}%`, minHeight: "4px" }}
       />
       <span className="text-xs text-gray-500">{label}</span>

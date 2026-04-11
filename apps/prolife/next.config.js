@@ -12,6 +12,12 @@ const nextConfig = {
     "@agency/scraping",
     "@agency/env",
   ],
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push("re2");
+    }
+    return config;
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

@@ -86,6 +86,39 @@ export const scoreCompany = inngest.createFunction(
       if (company.portfolioBrands.length >= 10) score += 5;
       else if (company.portfolioBrands.length >= 5) score += 3;
 
+      // 11. Intent signals from news (0-15 points)
+      // Recent high-relevance news = buying signal
+      const recentNews = await prisma.newsItem.findMany({
+        where: {
+          companyId,
+          relevanceScore: { gte: 60 },
+          createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }, // last 30 days
+        },
+        select: { category: true, relevanceScore: true },
+        orderBy: { relevanceScore: "desc" },
+        take: 5,
+      });
+
+      if (recentNews.length > 0) {
+        // Category-based intent scoring
+        const intentPoints: Record<string, number> = {
+          CONTRACT: 15,
+          EXPANSION: 15,
+          MA_FUNDING: 12,
+          PRODUCT_LAUNCH: 10,
+          TENDER: 8,
+          LEADERSHIP: 5,
+          REGULATORY: 5,
+          EVENT: 3,
+          GENERAL: 2,
+        };
+        // Take the highest-value signal
+        const maxIntent = Math.max(
+          ...recentNews.map((n) => intentPoints[n.category] ?? 0)
+        );
+        score += maxIntent;
+      }
+
       // Calculate priority
       let priority: "A" | "B" | "C";
       if (score >= 70) priority = "A";

@@ -11,6 +11,9 @@
  */
 
 import * as cheerio from "cheerio";
+import { fetchAllFDA } from "./sources/openfda";
+import { fetchPharmaDistributionTrials } from "./sources/clinical-trials";
+import { fetchEMAMedicines } from "./sources/ema";
 
 // ── Types ──
 
@@ -161,11 +164,14 @@ export async function fetchRSSFeed(
     $("item")
       .slice(0, maxResults)
       .each((_, item) => {
-        const title = $(item).find("title").text().trim();
+        const rawTitle = $(item).find("title").text().trim();
+        // Strip CDATA wrapper if present
+        const title = rawTitle.replace(/^<!\[CDATA\[|\]\]>$/g, "").trim();
         const url =
           $(item).find("link").text().trim() ||
           $(item).find("guid").text().trim();
-        const desc = $(item).find("description").text().trim();
+        const rawDesc = $(item).find("description").text().trim();
+        const desc = rawDesc.replace(/^<!\[CDATA\[|\]\]>$/g, "").trim();
         const pubDate = $(item).find("pubDate").text().trim();
         const snippet = cheerio.load(desc).text().replace(/\s+/g, " ").trim().slice(0, 500);
 
@@ -206,18 +212,47 @@ export async function fetchRSSFeed(
 
 // ── Curated pharma RSS feeds ──
 
-export function getPharmaRSSFeeds(): Array<{ url: string; name: string }> {
+export function getPharmaRSSFeeds(): Array<{ url: string; name: string; category: string }> {
   return [
-    // Industry news
-    { url: "https://www.fiercepharma.com/rss/xml", name: "FiercePharma" },
-    { url: "https://www.pharmaceutical-technology.com/feed/", name: "Pharma Technology" },
-    { url: "https://pharmaboardroom.com/feed/", name: "PharmaBoardroom" },
-    { url: "https://www.europeanpharmaceuticalreview.com/feed/", name: "EU Pharma Review" },
-    { url: "https://www.nutraceuticalsworld.com/rss", name: "Nutraceuticals World" },
-    // Regulatory
-    { url: "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases/rss.xml", name: "FDA Press Releases" },
-    // Distribution / supply chain
-    { url: "https://www.healthcaredistribution.org/news/feed", name: "HDA News" },
+    // ── Industry News ──
+    { url: "https://www.fiercepharma.com/rss/xml", name: "FiercePharma", category: "news" },
+    { url: "https://www.biopharmadive.com/feeds/news/", name: "BioPharma Dive", category: "news" },
+    { url: "https://endpts.com/feed", name: "Endpoints News", category: "news" },
+    { url: "https://pharmaphorum.com/rssfeed", name: "Pharmaphorum", category: "news" },
+    { url: "https://www.pharmaceutical-technology.com/feed/", name: "Pharma Technology", category: "news" },
+    { url: "https://pharmaboardroom.com/feed/", name: "PharmaBoardroom", category: "news" },
+    { url: "https://www.europeanpharmaceuticalreview.com/feed/", name: "EU Pharma Review", category: "news" },
+    { url: "https://www.pharmaceutical-business-review.com/feed/", name: "Pharma Business Review", category: "news" },
+    { url: "https://www.nutraceuticalsworld.com/rss", name: "Nutraceuticals World", category: "news" },
+
+    // ── Drugs.com (6 feeds) ──
+    { url: "https://www.drugs.com/feeds/medical-news.xml", name: "Drugs.com MedNews", category: "clinical" },
+    { url: "https://www.drugs.com/feeds/fda-alerts.xml", name: "Drugs.com FDA Alerts", category: "regulatory" },
+    { url: "https://www.drugs.com/feeds/new-drug-approvals.xml", name: "Drugs.com Approvals", category: "regulatory" },
+    { url: "https://www.drugs.com/feeds/new-drug-applications.xml", name: "Drugs.com Applications", category: "regulatory" },
+    { url: "https://www.drugs.com/feeds/drug-shortages.xml", name: "Drugs.com Shortages", category: "regulatory" },
+    { url: "https://www.drugs.com/feeds/clinical-trial-results.xml", name: "Drugs.com Trials", category: "clinical" },
+
+    // ── Regulatory ──
+    { url: "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases/rss.xml", name: "FDA Press Releases", category: "regulatory" },
+    { url: "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/drugs/rss.xml", name: "FDA Drugs", category: "regulatory" },
+    { url: "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/medwatch/rss.xml", name: "FDA MedWatch", category: "safety" },
+
+    // ── Distribution / Supply Chain ──
+    { url: "https://www.healthcaredistribution.org/news/feed", name: "HDA News", category: "distribution" },
+    { url: "https://www.drugstorenews.com/feed", name: "Drug Store News", category: "distribution" },
+    { url: "https://www.drugtopics.com/rss", name: "Drug Topics", category: "distribution" },
+
+    // ── Biotech / R&D ──
+    { url: "https://www.genengnews.com/feed/", name: "GEN News", category: "biotech" },
+    { url: "https://www.bioworld.com/rss/news", name: "BioWorld", category: "biotech" },
+
+    // ── Medical Devices ──
+    { url: "https://www.medtechdive.com/feeds/news/", name: "MedTech Dive", category: "medtech" },
+    { url: "https://www.medicaldevice-network.com/feed/", name: "Medical Device Network", category: "medtech" },
+    { url: "https://www.massdevice.com/feed/", name: "MassDevice", category: "medtech" },
+    { url: "https://www.mddionline.com/rss", name: "MD+DI Online", category: "medtech" },
+    { url: "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/medical-devices/rss.xml", name: "FDA Medical Devices", category: "medtech" },
   ];
 }
 
@@ -229,7 +264,13 @@ export function getPharmaRSSFeeds(): Array<{ url: string; name: string }> {
  */
 export async function aggregateNews(
   queries: string[],
-  options: { includeRSS?: boolean; maxPerSource?: number } = {}
+  options: {
+    includeRSS?: boolean;
+    includeFDA?: boolean;
+    includeClinicalTrials?: boolean;
+    includeEMA?: boolean;
+    maxPerSource?: number;
+  } = {}
 ): Promise<RawNewsItem[]> {
   const maxPer = options.maxPerSource ?? 10;
   const seen = new Set<string>();
@@ -237,7 +278,6 @@ export async function aggregateNews(
 
   const addItems = (items: RawNewsItem[]) => {
     for (const item of items) {
-      // Normalize URL for dedup
       const key = item.url.replace(/[?#].*$/, "").toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
@@ -246,26 +286,48 @@ export async function aggregateNews(
     }
   };
 
-  // Google News RSS for each query
+  // ── Google News RSS ──
   for (const query of queries) {
     const items = await fetchGoogleNewsRSS(query, maxPer);
     addItems(items);
-    await delay(1000); // Rate limit
+    await delay(1000);
   }
 
-  // GNews API for each query
+  // ── GNews API ──
   for (const query of queries) {
     const items = await fetchGNewsAPI(query, maxPer);
     addItems(items);
     await delay(500);
   }
 
-  // Industry RSS feeds
+  // ── Industry RSS feeds (23 feeds) ──
   if (options.includeRSS !== false) {
     const feeds = getPharmaRSSFeeds();
-    for (const feed of feeds) {
-      const items = await fetchRSSFeed(feed.url, feed.name, maxPer);
-      addItems(items);
+    const feedResults = await Promise.allSettled(
+      feeds.map((feed) => fetchRSSFeed(feed.url, feed.name, maxPer))
+    );
+    for (const result of feedResults) {
+      if (result.status === "fulfilled") addItems(result.value);
+    }
+  }
+
+  // ── OpenFDA (approvals, recalls, shortages) ──
+  if (options.includeFDA !== false) {
+    const fdaItems = await fetchAllFDA();
+    addItems(fdaItems);
+  }
+
+  // ── ClinicalTrials.gov ──
+  if (options.includeClinicalTrials !== false) {
+    const trialItems = await fetchPharmaDistributionTrials();
+    addItems(trialItems);
+  }
+
+  // ── EMA ──
+  if (options.includeEMA !== false) {
+    for (const query of queries.slice(0, 3)) {
+      const emaItems = await fetchEMAMedicines(query, 5);
+      addItems(emaItems);
     }
   }
 

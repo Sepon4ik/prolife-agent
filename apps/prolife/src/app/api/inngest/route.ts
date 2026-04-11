@@ -7,6 +7,9 @@ import { sendOutreach } from "@/inngest/functions/send-outreach";
 import { followUp } from "@/inngest/functions/follow-up";
 import { handleReply } from "@/inngest/functions/handle-reply";
 import { salesHandoff } from "@/inngest/functions/sales-handoff";
+import { newsCollect } from "@/inngest/functions/news-collect";
+import { newsBackfillContent } from "@/inngest/functions/news-backfill";
+import { newsEnrichCompanies } from "@/inngest/functions/news-enrich-companies";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -18,5 +21,8 @@ export const { GET, POST, PUT } = serve({
     followUp,
     handleReply,
     salesHandoff,
+    newsCollect,
+    newsBackfillContent,
+    newsEnrichCompanies,
   ],
 });

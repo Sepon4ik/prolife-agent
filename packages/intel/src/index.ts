@@ -15,6 +15,7 @@ export {
 export {
   matchEntitiesToCompanies,
   topicToQueries,
+  normalizeCompanyName,
 } from "./entity-matcher";
 
 export {
@@ -22,3 +23,30 @@ export {
   sendAlertNotifications,
   type AlertMatch,
 } from "./alerts";
+
+export {
+  extractArticleContent,
+  extractImageOnly,
+  findStockImage,
+  isDefaultImage,
+  translateToRussian,
+  extractAndTranslateBatch,
+  type ExtractedContent,
+  type TranslationResult,
+} from "./content-extractor";
+
+// New data sources
+export {
+  fetchAllFDA,
+  fetchFDAApprovals,
+  fetchFDARecalls,
+  fetchFDAShortages,
+  fetchClinicalTrials,
+  fetchPharmaDistributionTrials,
+  fetchEMAMedicines,
+  getEMARSSFeeds,
+  fetchPharmaTradeFlows,
+  fetchAllTargetMarketTrade,
+  TARGET_MARKETS,
+  PHARMA_HS_CODES,
+} from "./sources";

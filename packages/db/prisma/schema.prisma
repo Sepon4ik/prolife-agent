@@ -377,6 +377,13 @@ model NewsItem {
   publishedAt DateTime?
   category    NewsCategory @default(GENERAL)
 
+  // Full content (scraped from source)
+  fullContent       String?  // Extracted article text (Readability)
+  translatedContent String?  // Russian translation of full content (Claude)
+  translatedTitle   String?  // Russian translation of title
+  translatedSummary String?  // Russian translation of summary
+  imageUrl          String?  // OG image / preview thumbnail
+
   // AI-generated fields
   summary     String?      // 2-3 sentence AI summary
   entities    String[]     @default([]) // Company names mentioned
@@ -387,16 +394,24 @@ model NewsItem {
   // Link to existing companies in our DB
   companyId   String?      // If we matched a company
 
+  // Engagement scoring (self-learning)
+  engagementScore Int      @default(0)  // Accumulated: like +10, bookmark +5, click +1, dismiss -5
+  isBookmarked    Boolean  @default(false)
+  isDismissed     Boolean  @default(false)
+  clickCount      Int      @default(0)
+
   tenant  Tenant   @relation(fields: [tenantId], references: [id])
   topic   Topic?   @relation(fields: [topicId], references: [id])
   company Company? @relation(fields: [companyId], references: [id])
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@index([tenantId, category])
   @@index([tenantId, createdAt])
   @@index([companyId])
   @@index([relevanceScore])
+  @@index([engagementScore])
 }
 
 model Alert {

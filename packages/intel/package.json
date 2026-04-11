@@ -9,7 +9,11 @@
   },
   "dependencies": {
     "@agency/db": "workspace:*",
-    "cheerio": "^1.0.0"
+    "cheerio": "^1.0.0",
+    "metascraper": "^5.50.0",
+    "metascraper-image": "^5.50.0",
+    "metascraper-logo": "^5.50.0",
+    "metascraper-logo-favicon": "^5.50.0"
   },
   "devDependencies": {
     "@agency/tsconfig": "workspace:*",

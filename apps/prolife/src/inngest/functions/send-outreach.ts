@@ -52,7 +52,32 @@ export const sendOutreach = inngest.createFunction(
       return { company, contact };
     });
 
-    // Step 2: Generate personalized email
+    // Step 2: Fetch latest news about this company for personalization
+    const newsContext = await step.run("fetch-news-context", async () => {
+      const latestNews = await prisma.newsItem.findFirst({
+        where: {
+          companyId,
+          relevanceScore: { gte: 50 },
+          createdAt: { gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) }, // last 60 days
+        },
+        orderBy: { relevanceScore: "desc" },
+        select: {
+          title: true,
+          category: true,
+          summary: true,
+          publishedAt: true,
+        },
+      });
+      if (!latestNews) return null;
+      return {
+        title: latestNews.title,
+        category: latestNews.category,
+        summary: latestNews.summary,
+        publishedAt: latestNews.publishedAt?.toISOString().split("T")[0] ?? null,
+      };
+    });
+
+    // Step 3: Generate personalized email
     const email = await step.run("generate-email", async () => {
       return generateOutreachEmail({
         companyName: company.name,
@@ -60,10 +85,11 @@ export const sendOutreach = inngest.createFunction(
         country: company.country,
         companyType: company.type,
         categories: company.categories,
+        newsContext: newsContext ?? undefined,
       });
     });
 
-    // Step 3: Pick mailbox (rotation)
+    // Step 4: Pick mailbox (rotation)
     const mailbox = await step.run("pick-mailbox", async () => {
       const result = await pickMailboxWithStatus(prisma, tenantId);
       if (result.status === "selected") {
@@ -87,7 +113,7 @@ export const sendOutreach = inngest.createFunction(
       );
     });
 
-    // Step 4: Send email via selected mailbox
+    // Step 5: Send email via selected mailbox
     const sent = await step.run("send-email", async () => {
       const fromAddress = `${mailbox.name} <${mailbox.email}>`;
 

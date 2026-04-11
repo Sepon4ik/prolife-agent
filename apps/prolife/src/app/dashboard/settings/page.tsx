@@ -1,65 +1,45 @@
+import { Card } from "@agency/ui";
+import {
+  Key,
+  Search,
+  Mail,
+  Building2,
+  CheckCircle2,
+  XCircle,
+  Info,
+} from "lucide-react";
+
 export default function SettingsPage() {
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">Settings</h1>
+    <div className="p-6 lg:p-8 max-w-2xl">
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-white">Настройки</h1>
+        <p className="text-gray-500 text-xs mt-0.5">
+          Конфигурация системы и интеграции
+        </p>
+      </div>
 
-      <div className="space-y-6 max-w-2xl">
-        {/* API Keys */}
-        <SettingsSection title="API Configuration">
-          <SettingsRow
-            label="Anthropic API"
-            value="Connected"
-            status="active"
-          />
-          <SettingsRow
-            label="Email Provider"
-            value="Not configured"
-            status="inactive"
-          />
-          <SettingsRow
-            label="Stripe"
-            value="Not configured"
-            status="inactive"
-          />
+      <div className="space-y-5">
+        <SettingsSection title="API Конфигурация" icon={<Key className="w-4 h-4" />}>
+          <SettingsRow label="Anthropic API" value="Подключено" status="active" />
+          <SettingsRow label="Email провайдер" value="Не настроено" status="inactive" />
+          <SettingsRow label="Stripe" value="Не настроено" status="inactive" />
         </SettingsSection>
 
-        {/* Scraping */}
-        <SettingsSection title="Scraping Configuration">
-          <SettingsRow
-            label="Max concurrent jobs"
-            value="3"
-            status="neutral"
-          />
-          <SettingsRow
-            label="Proxy"
-            value="Not configured"
-            status="inactive"
-          />
+        <SettingsSection title="Скрейпинг" icon={<Search className="w-4 h-4" />}>
+          <SettingsRow label="Макс. параллельных задач" value="3" status="neutral" />
+          <SettingsRow label="Прокси" value="Не настроено" status="inactive" />
         </SettingsSection>
 
-        {/* Outreach */}
-        <SettingsSection title="Outreach Configuration">
-          <SettingsRow
-            label="Auto-send emails"
-            value="Disabled"
-            status="inactive"
-          />
-          <SettingsRow
-            label="Max follow-ups"
-            value="3"
-            status="neutral"
-          />
-          <SettingsRow
-            label="Follow-up delay"
-            value="5 days"
-            status="neutral"
-          />
+        <SettingsSection title="Рассылка" icon={<Mail className="w-4 h-4" />}>
+          <SettingsRow label="Авто-отправка писем" value="Выключено" status="inactive" />
+          <SettingsRow label="Макс. фоллоу-апов" value="3" status="neutral" />
+          <SettingsRow label="Задержка фоллоу-апа" value="5 дней" status="neutral" />
         </SettingsSection>
 
-        {/* Tenant */}
-        <SettingsSection title="Organization">
-          <p className="text-gray-400 text-sm">
-            Multi-tenant settings will be available once authentication is configured.
+        <SettingsSection title="Организация" icon={<Building2 className="w-4 h-4" />}>
+          <p className="text-gray-500 text-xs">
+            Настройки мультитенанта будут доступны после настройки авторизации.
           </p>
         </SettingsSection>
       </div>
@@ -69,18 +49,21 @@ export default function SettingsPage() {
 
 function SettingsSection({
   title,
+  icon,
   children,
 }: {
   title: string;
+  icon: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-dark-secondary rounded-lg border border-white/10 overflow-hidden">
-      <div className="px-5 py-3 border-b border-white/10">
+    <Card className="overflow-hidden">
+      <div className="px-5 py-3 border-b border-white/5 flex items-center gap-2">
+        <span className="text-gray-500">{icon}</span>
         <h2 className="text-sm font-semibold text-gray-300">{title}</h2>
       </div>
       <div className="p-5 space-y-3">{children}</div>
-    </div>
+    </Card>
   );
 }
 
@@ -93,19 +76,17 @@ function SettingsRow({
   value: string;
   status: "active" | "inactive" | "neutral";
 }) {
-  const statusDot = {
-    active: "bg-green-400",
-    inactive: "bg-gray-500",
-    neutral: "bg-blue-400",
+  const icons = {
+    active: <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />,
+    inactive: <XCircle className="w-3.5 h-3.5 text-gray-600" />,
+    neutral: <Info className="w-3.5 h-3.5 text-blue-400" />,
   };
 
   return (
     <div className="flex items-center justify-between py-1">
       <span className="text-sm text-gray-300">{label}</span>
       <div className="flex items-center gap-2">
-        <span
-          className={`w-1.5 h-1.5 rounded-full ${statusDot[status]}`}
-        />
+        {icons[status]}
         <span className="text-sm text-gray-400">{value}</span>
       </div>
     </div>

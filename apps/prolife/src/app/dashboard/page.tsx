@@ -1,13 +1,35 @@
 import { prisma } from "@agency/db";
 import Link from "next/link";
+import {
+  KpiCard,
+  Card,
+  CardHeader,
+  CardContent,
+  StatusBadge,
+  ScoreBadge,
+  PriorityBadge,
+  EmptyState,
+  priorityStyles,
+  timeAgo,
+} from "@agency/ui";
+import {
+  Users,
+  Mail,
+  MessageSquare,
+  TrendingUp,
+  ChevronRight,
+  AlertCircle,
+  Clock,
+  Zap,
+  Globe,
+  MailOpen,
+  MailWarning,
+  Loader2,
+  Eye,
+  Reply,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
-
-const priorityConfig = {
-  A: { label: "Hot", color: "bg-green-500", text: "text-green-400", border: "border-green-500/30", bg: "bg-green-500/10" },
-  B: { label: "Warm", color: "bg-yellow-500", text: "text-yellow-400", border: "border-yellow-500/30", bg: "bg-yellow-500/10" },
-  C: { label: "Cold", color: "bg-gray-500", text: "text-gray-400", border: "border-gray-500/30", bg: "bg-gray-500/10" },
-};
 
 export default async function DashboardPage() {
   let dbError: string | null = null;
@@ -16,29 +38,42 @@ export default async function DashboardPage() {
     emailsSent: 0,
     replyRate: 0,
     conversionRate: 0,
-    // Week deltas
     pipelineNew: 0,
     emailsNew: 0,
-    // Action items
     repliesWaiting: 0,
     readyForOutreach: 0,
     bouncedEmails: 0,
     runningJobs: 0,
-    // Priority breakdown
     priorityA: 0,
     priorityB: 0,
     priorityC: 0,
-    // Funnel
     funnel: { sent: 0, delivered: 0, opened: 0, replied: 0 },
-    // Score distribution
     scoreDistribution: [] as { range: string; count: number; color: string }[],
-    // Hot leads
-    hotLeads: [] as { id: string; name: string; score: number; status: string; country: string }[],
-    // Activity feed
-    recentEmails: [] as { id: string; status: string; updatedAt: Date; company: { name: string } }[],
-    recentJobs: [] as { id: string; sourceType: string; status: string; totalFound: number; totalNew: number; createdAt: Date }[],
-    // Geographic reach
-    countryCount: 0,
+    hotLeads: [] as {
+      id: string;
+      name: string;
+      score: number;
+      status: string;
+      country: string;
+      priority: string;
+      type: string;
+      contacts: { name: string; title: string | null }[];
+    }[],
+    recentEmails: [] as {
+      id: string;
+      status: string;
+      updatedAt: Date;
+      company: { name: string };
+    }[],
+    recentJobs: [] as {
+      id: string;
+      sourceType: string;
+      sourceName: string | null;
+      status: string;
+      totalFound: number;
+      totalNew: number;
+      createdAt: Date;
+    }[],
     topCountries: [] as { country: string; count: number }[],
   };
 
@@ -65,50 +100,43 @@ export default async function DashboardPage() {
       recentJobs,
       countryGroups,
     ] = await Promise.all([
-      // Pipeline total
       prisma.company.count({ where: { deletedAt: null } }),
-      // New this week
       prisma.company.count({
         where: { deletedAt: null, createdAt: { gte: oneWeekAgo } },
       }),
-      // Emails sent
       prisma.email.count({
         where: { status: { notIn: ["QUEUED", "FAILED"] } },
       }),
-      // Emails this week
       prisma.email.count({
-        where: { createdAt: { gte: oneWeekAgo }, status: { notIn: ["QUEUED", "FAILED"] } },
+        where: {
+          createdAt: { gte: oneWeekAgo },
+          status: { notIn: ["QUEUED", "FAILED"] },
+        },
       }),
-      // Replies
       prisma.email.count({ where: { status: "REPLIED" } }),
-      // Interested + handed off
       prisma.company.count({
-        where: { status: { in: ["INTERESTED", "HANDED_OFF"] }, deletedAt: null },
+        where: {
+          status: { in: ["INTERESTED", "HANDED_OFF"] },
+          deletedAt: null,
+        },
       }),
-      // ACTION: Replies waiting for review
       prisma.company.count({
         where: { status: "REPLIED", deletedAt: null },
       }),
-      // ACTION: Scored but not yet contacted
       prisma.company.count({
         where: { status: "SCORED", deletedAt: null },
       }),
-      // ACTION: Bounced emails
       prisma.email.count({ where: { status: "BOUNCED" } }),
-      // ACTION: Running scraping jobs
       prisma.scrapingJob.count({ where: { status: "running" } }),
-      // Priority breakdown
       prisma.company.groupBy({
         by: ["priority"],
         _count: { _all: true },
         where: { deletedAt: null },
       }),
-      // Email funnel
       prisma.email.groupBy({
         by: ["status"],
         _count: { _all: true },
       }),
-      // Score distribution (4 buckets via raw query)
       prisma.$queryRaw`
         SELECT
           CASE
@@ -123,7 +151,6 @@ export default async function DashboardPage() {
         GROUP BY range
         ORDER BY range DESC
       ` as Promise<{ range: string; count: number }[]>,
-      // Hot leads: top 5 by score, that are REPLIED or INTERESTED
       prisma.company.findMany({
         where: {
           status: { in: ["REPLIED", "INTERESTED"] },
@@ -146,7 +173,6 @@ export default async function DashboardPage() {
           },
         },
       }),
-      // Recent email activity
       prisma.email.findMany({
         where: { status: { in: ["REPLIED", "OPENED", "BOUNCED"] } },
         orderBy: { updatedAt: "desc" },
@@ -158,7 +184,6 @@ export default async function DashboardPage() {
           company: { select: { name: true } },
         },
       }),
-      // Recent scraping jobs
       prisma.scrapingJob.findMany({
         orderBy: { createdAt: "desc" },
         take: 3,
@@ -172,7 +197,6 @@ export default async function DashboardPage() {
           createdAt: true,
         },
       }),
-      // Countries
       prisma.company.groupBy({
         by: ["country"],
         _count: { _all: true },
@@ -182,20 +206,21 @@ export default async function DashboardPage() {
       }),
     ]);
 
-    // Build email funnel
     const emailMap = Object.fromEntries(
       emailStatusGroups.map((g) => [g.status, g._count._all])
     );
     const totalEmailsSent =
-      (emailMap.SENT ?? 0) + (emailMap.DELIVERED ?? 0) + (emailMap.OPENED ?? 0) +
-      (emailMap.CLICKED ?? 0) + (emailMap.REPLIED ?? 0) + (emailMap.BOUNCED ?? 0);
+      (emailMap.SENT ?? 0) +
+      (emailMap.DELIVERED ?? 0) +
+      (emailMap.OPENED ?? 0) +
+      (emailMap.CLICKED ?? 0) +
+      (emailMap.REPLIED ?? 0) +
+      (emailMap.BOUNCED ?? 0);
 
-    // Priority map
     const priorityMap = Object.fromEntries(
       priorityGroups.map((g) => [g.priority, g._count._all])
     );
 
-    // Score colors
     const scoreColors: Record<string, string> = {
       "80-100": "bg-green-500",
       "60-79": "bg-emerald-500",
@@ -206,8 +231,14 @@ export default async function DashboardPage() {
     data = {
       pipeline: totalCompanies,
       emailsSent,
-      replyRate: emailsSent > 0 ? Math.round((repliesCount / emailsSent) * 100) : 0,
-      conversionRate: emailsSent > 0 ? Math.round((interestedCount / emailsSent) * 100) : 0,
+      replyRate:
+        emailsSent > 0
+          ? Math.round((repliesCount / emailsSent) * 100)
+          : 0,
+      conversionRate:
+        emailsSent > 0
+          ? Math.round((interestedCount / emailsSent) * 100)
+          : 0,
       pipelineNew: newThisWeek,
       emailsNew: emailsThisWeek,
       repliesWaiting,
@@ -219,8 +250,15 @@ export default async function DashboardPage() {
       priorityC: priorityMap.C ?? 0,
       funnel: {
         sent: totalEmailsSent,
-        delivered: (emailMap.DELIVERED ?? 0) + (emailMap.OPENED ?? 0) + (emailMap.CLICKED ?? 0) + (emailMap.REPLIED ?? 0),
-        opened: (emailMap.OPENED ?? 0) + (emailMap.CLICKED ?? 0) + (emailMap.REPLIED ?? 0),
+        delivered:
+          (emailMap.DELIVERED ?? 0) +
+          (emailMap.OPENED ?? 0) +
+          (emailMap.CLICKED ?? 0) +
+          (emailMap.REPLIED ?? 0),
+        opened:
+          (emailMap.OPENED ?? 0) +
+          (emailMap.CLICKED ?? 0) +
+          (emailMap.REPLIED ?? 0),
         replied: emailMap.REPLIED ?? 0,
       },
       scoreDistribution: (scoreRanges || []).map((r) => ({
@@ -231,90 +269,105 @@ export default async function DashboardPage() {
       hotLeads,
       recentEmails,
       recentJobs,
-      countryCount: countryGroups.length,
       topCountries: countryGroups.map((g) => ({
         country: g.country,
         count: g._count._all,
       })),
     };
-  } catch (error: any) {
-    dbError = error.message;
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    dbError = message;
     console.error("Dashboard DB error:", error);
   }
 
-  const totalActions = data.repliesWaiting + data.readyForOutreach + data.bouncedEmails + data.runningJobs;
-  const maxScore = Math.max(...data.scoreDistribution.map((s) => s.count), 1);
-  const totalPriority = data.priorityA + data.priorityB + data.priorityC || 1;
+  const totalActions =
+    data.repliesWaiting +
+    data.readyForOutreach +
+    data.bouncedEmails +
+    data.runningJobs;
+  const maxScore = Math.max(
+    ...data.scoreDistribution.map((s) => s.count),
+    1
+  );
+  const totalPriority =
+    data.priorityA + data.priorityB + data.priorityC || 1;
 
   return (
     <div className="p-6 lg:p-8 max-w-[1400px]">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Command Center</h1>
+          <h1 className="text-xl font-bold text-white">Центр управления</h1>
           <p className="text-gray-500 text-xs mt-0.5">
-            Global distributor acquisition pipeline
+            Пайплайн привлечения дистрибьюторов
           </p>
         </div>
-        <div className="text-xs text-gray-600">
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
+        <div className="text-xs text-gray-600 tabular-nums">
+          {new Date().toLocaleDateString("ru-RU", {
+            weekday: "short",
+            month: "short",
             day: "numeric",
           })}
         </div>
       </div>
 
       {dbError && (
-        <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-          <p className="text-red-400 text-sm font-medium">Database Error</p>
-          <p className="text-red-300/70 text-xs mt-1">{dbError}</p>
+        <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-red-400 text-sm font-medium">Ошибка базы данных</p>
+            <p className="text-red-300/70 text-xs mt-1">{dbError}</p>
+          </div>
         </div>
       )}
 
-      {/* === ACTION PANEL === */}
+      {/* Action Panel */}
       {totalActions > 0 && (
         <div className="mb-6 bg-primary-600/5 border border-primary-600/20 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
             <h2 className="text-sm font-semibold text-primary-400">
-              Needs Your Attention
+              Требует внимания
             </h2>
-            <span className="ml-auto text-xs text-gray-500">
-              {totalActions} action{totalActions !== 1 ? "s" : ""}
+            <span className="ml-auto text-xs text-gray-500 tabular-nums">
+              {totalActions} действи{totalActions === 1 ? "е" : totalActions < 5 ? "я" : "й"}
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
             {data.repliesWaiting > 0 && (
               <ActionItem
                 count={data.repliesWaiting}
-                label="replies waiting for review"
+                label="ответов ждут проверки"
                 href="/dashboard/companies?status=REPLIED"
+                icon={<Reply className="w-3.5 h-3.5" />}
                 urgency="high"
               />
             )}
             {data.readyForOutreach > 0 && (
               <ActionItem
                 count={data.readyForOutreach}
-                label="companies ready for outreach"
+                label="готовы к рассылке"
                 href="/dashboard/companies?status=SCORED"
+                icon={<Mail className="w-3.5 h-3.5" />}
                 urgency="medium"
               />
             )}
             {data.bouncedEmails > 0 && (
               <ActionItem
                 count={data.bouncedEmails}
-                label="bounced emails"
+                label="отскочивших писем"
                 href="/dashboard/outreach"
+                icon={<MailWarning className="w-3.5 h-3.5" />}
                 urgency="high"
               />
             )}
             {data.runningJobs > 0 && (
               <ActionItem
                 count={data.runningJobs}
-                label={data.runningJobs === 1 ? "scraping job running" : "scraping jobs running"}
+                label={data.runningJobs === 1 ? "задача запущена" : "задач запущено"}
                 href="/dashboard/sources"
+                icon={<Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 urgency="low"
               />
             )}
@@ -322,236 +375,236 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* === KPI CARDS === */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KpiCard
-          title="Pipeline"
+          title="Пайплайн"
           value={data.pipeline}
           delta={data.pipelineNew}
-          deltaLabel="this week"
+          deltaLabel="за неделю"
+          icon={<Users className="w-4 h-4" />}
         />
         <KpiCard
-          title="Emails Sent"
+          title="Отправлено"
           value={data.emailsSent}
           delta={data.emailsNew}
-          deltaLabel="this week"
+          deltaLabel="за неделю"
+          icon={<Mail className="w-4 h-4" />}
         />
         <KpiCard
-          title="Reply Rate"
+          title="Ответы"
           value={`${data.replyRate}%`}
-          subtitle={data.replyRate >= 10 ? "Above avg" : data.replyRate >= 5 ? "Average" : "Below avg"}
-          subtitleColor={data.replyRate >= 10 ? "text-green-400" : data.replyRate >= 5 ? "text-yellow-400" : "text-gray-500"}
+          subtitle={
+            data.replyRate >= 10
+              ? "Выше среднего"
+              : data.replyRate >= 5
+                ? "Средне"
+                : "Ниже среднего"
+          }
+          subtitleColor={
+            data.replyRate >= 10
+              ? "text-green-400"
+              : data.replyRate >= 5
+                ? "text-yellow-400"
+                : "text-gray-500"
+          }
+          icon={<MessageSquare className="w-4 h-4" />}
         />
         <KpiCard
-          title="Conversion"
+          title="Конверсия"
           value={`${data.conversionRate}%`}
-          subtitle={`${data.priorityA + (data.hotLeads?.length ?? 0)} interested`}
+          subtitle={`${interestedTotal(data)} заинтересованы`}
           subtitleColor="text-green-400"
+          icon={<TrendingUp className="w-4 h-4" />}
         />
       </div>
 
-      {/* === MAIN GRID === */}
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Pipeline Quality — 2 columns */}
-        <div className="lg:col-span-2 bg-dark-secondary rounded-xl border border-white/5 p-5">
-          <h2 className="text-sm font-semibold text-white mb-4">
-            Pipeline Quality
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Priority breakdown */}
-            <div>
-              <p className="text-xs text-gray-500 mb-3 uppercase tracking-wider">
-                Lead Temperature
-              </p>
-              <div className="space-y-3">
-                {(["A", "B", "C"] as const).map((p) => {
-                  const cfg = priorityConfig[p];
-                  const count = p === "A" ? data.priorityA : p === "B" ? data.priorityB : data.priorityC;
-                  const pct = Math.round((count / totalPriority) * 100);
-                  return (
-                    <div key={p} className="flex items-center gap-3">
-                      <span
-                        className={`text-xs font-bold px-2 py-0.5 rounded ${cfg.bg} ${cfg.text} ${cfg.border} border`}
-                      >
-                        {cfg.label}
-                      </span>
-                      <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${cfg.color} rounded-full transition-all`}
-                          style={{ width: `${Math.max(pct, 2)}%` }}
-                        />
+        {/* Pipeline Quality */}
+        <Card className="lg:col-span-2">
+          <CardContent>
+            <h2 className="text-sm font-semibold text-white mb-4">
+              Качество пайплайна
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Priority breakdown */}
+              <div>
+                <p className="text-xs text-gray-500 mb-3 uppercase tracking-wider">
+                  Температура лидов
+                </p>
+                <div className="space-y-3">
+                  {(["A", "B", "C"] as const).map((p) => {
+                    const cfg = priorityStyles[p];
+                    const count =
+                      p === "A"
+                        ? data.priorityA
+                        : p === "B"
+                          ? data.priorityB
+                          : data.priorityC;
+                    const pct = Math.round((count / totalPriority) * 100);
+                    return (
+                      <div key={p} className="flex items-center gap-3">
+                        <PriorityBadge priority={p} className="w-14 justify-center" />
+                        <div className="flex-1 h-2.5 bg-white/5 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${cfg.bar} rounded-full transition-all`}
+                            style={{ width: `${Math.max(pct, 2)}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-white w-8 text-right tabular-nums">
+                          {count}
+                        </span>
+                        <span className="text-xs text-gray-500 w-10 tabular-nums">
+                          {pct}%
+                        </span>
                       </div>
-                      <span className="text-sm font-medium text-white w-8 text-right">
-                        {count}
-                      </span>
-                      <span className="text-xs text-gray-500 w-10">
-                        {pct}%
-                      </span>
+                    );
+                  })}
+                </div>
+
+                {/* Top Markets */}
+                {data.topCountries.length > 0 && (
+                  <div className="mt-5 pt-4 border-t border-white/5">
+                    <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider flex items-center gap-1.5">
+                      <Globe className="w-3 h-3" />
+                      Топ рынки
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {data.topCountries.map((c) => (
+                        <span
+                          key={c.country}
+                          className="text-xs px-2 py-1 rounded bg-white/5 text-gray-300"
+                        >
+                          {c.country}{" "}
+                          <span className="text-gray-500 tabular-nums">
+                            {c.count}
+                          </span>
+                        </span>
+                      ))}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
               </div>
 
-              {/* Geographic reach */}
-              {data.topCountries.length > 0 && (
-                <div className="mt-5 pt-4 border-t border-white/5">
-                  <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider">
-                    Top Markets
+              {/* Score distribution */}
+              <div>
+                <p className="text-xs text-gray-500 mb-3 uppercase tracking-wider">
+                  Распределение баллов
+                </p>
+                {data.scoreDistribution.length === 0 ? (
+                  <p className="text-gray-600 text-xs">
+                    Нет оцененных компаний
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {data.topCountries.map((c) => (
-                      <span
-                        key={c.country}
-                        className="text-xs px-2 py-1 rounded bg-white/5 text-gray-300"
-                      >
-                        {c.country}{" "}
-                        <span className="text-gray-500">{c.count}</span>
-                      </span>
+                ) : (
+                  <div className="space-y-2.5">
+                    {data.scoreDistribution.map((s) => (
+                      <div key={s.range} className="flex items-center gap-3">
+                        <span className="text-xs text-gray-400 w-14 font-mono tabular-nums">
+                          {s.range}
+                        </span>
+                        <div className="flex-1 h-2.5 bg-white/5 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${s.color} rounded-full opacity-80`}
+                            style={{
+                              width: `${Math.max((s.count / maxScore) * 100, 3)}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-white w-8 text-right tabular-nums">
+                          {s.count}
+                        </span>
+                      </div>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
-
-            {/* Score distribution */}
-            <div>
-              <p className="text-xs text-gray-500 mb-3 uppercase tracking-wider">
-                Score Distribution
-              </p>
-              {data.scoreDistribution.length === 0 ? (
-                <p className="text-gray-600 text-xs">
-                  No scored companies yet.
-                </p>
-              ) : (
-                <div className="space-y-2.5">
-                  {data.scoreDistribution.map((s) => (
-                    <div key={s.range} className="flex items-center gap-3">
-                      <span className="text-xs text-gray-400 w-14 font-mono">
-                        {s.range}
-                      </span>
-                      <div className="flex-1 h-3 bg-white/5 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${s.color} rounded-full opacity-80`}
-                          style={{
-                            width: `${Math.max((s.count / maxScore) * 100, 3)}%`,
-                          }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium text-white w-8 text-right">
-                        {s.count}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Quick score legend */}
-              <div className="mt-4 pt-3 border-t border-white/5">
-                <p className="text-[10px] text-gray-600 leading-relaxed">
-                  Score weights: Geography (20) + Type (15) + Revenue (15) +
-                  Sales Team (10) + Med Reps (10) + Pharmacy Network (10) +
-                  E-commerce (5) + Marketing (5) + Seeking Brands (5) +
-                  Portfolio (5)
-                </p>
+                )}
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Outreach Funnel — 1 column */}
-        <div className="bg-dark-secondary rounded-xl border border-white/5 p-5">
-          <h2 className="text-sm font-semibold text-white mb-4">
-            Outreach Funnel
-          </h2>
-          {data.funnel.sent === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-center">
-              <p className="text-gray-500 text-sm">No emails sent yet</p>
-              <p className="text-gray-600 text-xs mt-1">
-                Pipeline companies with Priority A/B will be contacted automatically
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              <FunnelStep
-                label="Sent"
-                count={data.funnel.sent}
-                total={data.funnel.sent}
-                color="bg-blue-500"
+        {/* Outreach Funnel */}
+        <Card>
+          <CardContent>
+            <h2 className="text-sm font-semibold text-white mb-4">
+              Воронка рассылки
+            </h2>
+            {data.funnel.sent === 0 ? (
+              <EmptyState
+                icon={<Mail className="w-8 h-8" />}
+                title="Писем пока нет"
+                description="Компании с приоритетом A/B будут автоматически контактированы"
               />
-              <FunnelStep
-                label="Delivered"
-                count={data.funnel.delivered}
-                total={data.funnel.sent}
-                color="bg-cyan-500"
-              />
-              <FunnelStep
-                label="Opened"
-                count={data.funnel.opened}
-                total={data.funnel.sent}
-                color="bg-purple-500"
-              />
-              <FunnelStep
-                label="Replied"
-                count={data.funnel.replied}
-                total={data.funnel.sent}
-                color="bg-green-500"
-              />
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="space-y-2.5">
+                <FunnelStep
+                  label="Отправлено"
+                  count={data.funnel.sent}
+                  total={data.funnel.sent}
+                  color="bg-blue-500"
+                />
+                <FunnelStep
+                  label="Доставлено"
+                  count={data.funnel.delivered}
+                  total={data.funnel.sent}
+                  color="bg-cyan-500"
+                />
+                <FunnelStep
+                  label="Прочитано"
+                  count={data.funnel.opened}
+                  total={data.funnel.sent}
+                  color="bg-purple-500"
+                />
+                <FunnelStep
+                  label="Ответили"
+                  count={data.funnel.replied}
+                  total={data.funnel.sent}
+                  color="bg-green-500"
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* === BOTTOM GRID === */}
+      {/* Bottom Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Hot Leads */}
-        <div className="bg-dark-secondary rounded-xl border border-white/5 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-white">Hot Leads</h2>
-            <Link
-              href="/dashboard/companies"
-              className="text-xs text-primary-400 hover:text-primary-300"
-            >
-              View all
-            </Link>
-          </div>
-          {data.hotLeads.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500 text-sm">No hot leads yet</p>
-              <p className="text-gray-600 text-xs mt-1">
-                Leads appear here when they reply to outreach
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {data.hotLeads.map((lead: any) => {
-                const pcfg = priorityConfig[lead.priority as keyof typeof priorityConfig];
-                return (
-                  <div
+        <Card>
+          <CardHeader
+            action={
+              <Link
+                href="/dashboard/companies"
+                className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1"
+              >
+                Все <ChevronRight className="w-3 h-3" />
+              </Link>
+            }
+          >
+            Горячие лиды
+          </CardHeader>
+          <CardContent className="pt-3">
+            {data.hotLeads.length === 0 ? (
+              <EmptyState
+                icon={<Zap className="w-8 h-8" />}
+                title="Горячих лидов пока нет"
+                description="Здесь появятся лиды, которые ответили на рассылку"
+              />
+            ) : (
+              <div className="space-y-1.5">
+                {data.hotLeads.map((lead) => (
+                  <Link
                     key={lead.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] transition-colors"
+                    href={`/dashboard/companies/${lead.id}`}
+                    className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/[0.04] transition-colors group"
                   >
-                    {/* Score circle */}
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold border ${
-                        lead.score >= 70
-                          ? "border-green-500/40 text-green-400 bg-green-500/10"
-                          : lead.score >= 40
-                            ? "border-yellow-500/40 text-yellow-400 bg-yellow-500/10"
-                            : "border-gray-500/40 text-gray-400 bg-gray-500/10"
-                      }`}
-                    >
-                      {lead.score}
-                    </div>
+                    <ScoreBadge score={lead.score} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white truncate">
+                        <span className="text-sm font-medium text-white truncate group-hover:text-primary-400 transition-colors">
                           {lead.name}
                         </span>
-                        <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${pcfg.bg} ${pcfg.text}`}
-                        >
-                          {pcfg.label}
-                        </span>
+                        <PriorityBadge priority={lead.priority} />
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
                         {lead.country}
@@ -559,127 +612,95 @@ export default async function DashboardPage() {
                           ` · ${lead.contacts[0].name}${lead.contacts[0].title ? `, ${lead.contacts[0].title}` : ""}`}
                       </div>
                     </div>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded ${
-                        lead.status === "INTERESTED"
-                          ? "bg-green-500/20 text-green-300"
-                          : "bg-cyan-500/20 text-cyan-300"
-                      }`}
-                    >
-                      {lead.status === "INTERESTED" ? "Interested" : "Replied"}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                    <StatusBadge status={lead.status} />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Activity Feed */}
-        <div className="bg-dark-secondary rounded-xl border border-white/5 p-5">
-          <h2 className="text-sm font-semibold text-white mb-4">
-            Recent Activity
-          </h2>
-          {data.recentEmails.length === 0 && data.recentJobs.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500 text-sm">No activity yet</p>
-              <p className="text-gray-600 text-xs mt-1">
-                Start by adding sources to discover companies
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {/* Merge and sort by time */}
-              {[
-                ...data.recentEmails.map((e: any) => ({
-                  time: new Date(e.updatedAt),
-                  type: "email" as const,
-                  status: e.status,
-                  company: e.company.name,
-                })),
-                ...data.recentJobs.map((j: any) => ({
-                  time: new Date(j.createdAt),
-                  type: "job" as const,
-                  status: j.status,
-                  source: j.sourceName || j.sourceType,
-                  found: j.totalFound,
-                  newCount: j.totalNew,
-                })),
-              ]
-                .sort((a, b) => b.time.getTime() - a.time.getTime())
-                .slice(0, 10)
-                .map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 py-2 border-b border-white/[0.03] last:border-0"
-                  >
-                    <ActivityDot
-                      type={
-                        item.type === "email"
-                          ? item.status === "REPLIED"
-                            ? "success"
-                            : item.status === "BOUNCED"
-                              ? "error"
-                              : "info"
-                          : item.status === "completed"
-                            ? "success"
-                            : item.status === "running"
-                              ? "info"
-                              : item.status === "failed"
-                                ? "error"
-                                : "neutral"
-                      }
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-gray-300">
-                        {item.type === "email" ? (
-                          <>
-                            <span className="text-white font-medium">
-                              {item.company}
-                            </span>{" "}
-                            {item.status === "REPLIED"
-                              ? "replied to outreach"
-                              : item.status === "OPENED"
-                                ? "opened email"
-                                : "email bounced"}
-                          </>
-                        ) : (
-                          <>
-                            Scrape{" "}
-                            <span className="text-white font-medium">
-                              {item.source}
-                            </span>{" "}
-                            {item.status === "completed"
-                              ? `done — ${item.found} found, ${item.newCount} new`
-                              : item.status}
-                          </>
-                        )}
-                      </p>
+        <Card>
+          <CardHeader>Последняя активность</CardHeader>
+          <CardContent className="pt-3">
+            {data.recentEmails.length === 0 &&
+            data.recentJobs.length === 0 ? (
+              <EmptyState
+                icon={<Clock className="w-8 h-8" />}
+                title="Активности пока нет"
+                description="Добавьте источники для поиска компаний"
+              />
+            ) : (
+              <div className="space-y-0.5">
+                {mergeActivity(data.recentEmails, data.recentJobs)
+                  .slice(0, 10)
+                  .map((item, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 py-2 border-b border-white/[0.03] last:border-0"
+                    >
+                      <ActivityIcon type={item.type} status={item.status} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-300">
+                          {item.type === "email" ? (
+                            <>
+                              <span className="text-white font-medium">
+                                {item.company}
+                              </span>{" "}
+                              {item.status === "REPLIED"
+                                ? "ответил на рассылку"
+                                : item.status === "OPENED"
+                                  ? "прочитал письмо"
+                                  : "письмо отскочило"}
+                            </>
+                          ) : (
+                            <>
+                              Скрейпинг{" "}
+                              <span className="text-white font-medium">
+                                {item.source}
+                              </span>{" "}
+                              {item.status === "completed"
+                                ? `завершен — ${item.found} найдено, ${item.newCount} новых`
+                                : item.status === "running" ? "запущен" : item.status}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-gray-600 whitespace-nowrap tabular-nums">
+                        {timeAgo(item.time)}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-gray-600 whitespace-nowrap">
-                      {timeAgo(item.time)}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
+                  ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
-// === COMPONENTS ===
+// --- Helper components ---
+
+function interestedTotal(data: {
+  priorityA: number;
+  hotLeads: { id: string }[];
+}) {
+  return data.priorityA + (data.hotLeads?.length ?? 0);
+}
 
 function ActionItem({
   count,
   label,
   href,
+  icon,
   urgency,
 }: {
   count: number;
   label: string;
   href: string;
+  icon: React.ReactNode;
   urgency: "high" | "medium" | "low";
 }) {
   const colors = {
@@ -698,62 +719,13 @@ function ActionItem({
       href={href}
       className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-colors ${colors[urgency]}`}
     >
-      <span className={`text-lg font-bold ${countColors[urgency]}`}>
+      <span className={countColors[urgency]}>{icon}</span>
+      <span className={`text-lg font-bold tabular-nums ${countColors[urgency]}`}>
         {count}
       </span>
       <span className="text-xs text-gray-300">{label}</span>
-      <svg
-        className="w-3 h-3 text-gray-600 ml-auto"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 5l7 7-7 7"
-        />
-      </svg>
+      <ChevronRight className="w-3 h-3 text-gray-600 ml-auto" />
     </Link>
-  );
-}
-
-function KpiCard({
-  title,
-  value,
-  delta,
-  deltaLabel,
-  subtitle,
-  subtitleColor,
-}: {
-  title: string;
-  value: string | number;
-  delta?: number;
-  deltaLabel?: string;
-  subtitle?: string;
-  subtitleColor?: string;
-}) {
-  return (
-    <div className="bg-dark-secondary rounded-xl border border-white/5 p-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wider">{title}</p>
-      <p className="text-3xl font-bold text-white mt-1">{value}</p>
-      {delta !== undefined && delta > 0 && (
-        <p className="text-xs text-green-400 mt-1">
-          +{delta} {deltaLabel}
-        </p>
-      )}
-      {delta !== undefined && delta === 0 && (
-        <p className="text-xs text-gray-600 mt-1">
-          No change {deltaLabel}
-        </p>
-      )}
-      {subtitle && (
-        <p className={`text-xs mt-1 ${subtitleColor ?? "text-gray-500"}`}>
-          {subtitle}
-        </p>
-      )}
-    </div>
   );
 }
 
@@ -776,11 +748,15 @@ function FunnelStep({
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs text-gray-400">{label}</span>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-white">{count}</span>
-          <span className="text-[10px] text-gray-600">{pct}%</span>
+          <span className="text-xs font-medium text-white tabular-nums">
+            {count}
+          </span>
+          <span className="text-[10px] text-gray-600 tabular-nums">
+            {pct}%
+          </span>
         </div>
       </div>
-      <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
+      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
         <div
           className={`h-full ${color} rounded-full opacity-80 transition-all`}
           style={{ width: `${barWidth}%` }}
@@ -790,23 +766,75 @@ function FunnelStep({
   );
 }
 
-function ActivityDot({ type }: { type: "success" | "error" | "info" | "neutral" }) {
-  const colors = {
-    success: "bg-green-500",
-    error: "bg-red-500",
-    info: "bg-blue-500",
-    neutral: "bg-gray-500",
-  };
-  return <div className={`w-1.5 h-1.5 rounded-full ${colors[type]} shrink-0`} />;
+function ActivityIcon({
+  type,
+  status,
+}: {
+  type: "email" | "job";
+  status: string;
+}) {
+  if (type === "email") {
+    if (status === "REPLIED")
+      return <Reply className="w-3.5 h-3.5 text-green-400 shrink-0" />;
+    if (status === "OPENED")
+      return <Eye className="w-3.5 h-3.5 text-purple-400 shrink-0" />;
+    return <MailWarning className="w-3.5 h-3.5 text-red-400 shrink-0" />;
+  }
+  if (status === "completed")
+    return <Zap className="w-3.5 h-3.5 text-green-400 shrink-0" />;
+  if (status === "running")
+    return <Loader2 className="w-3.5 h-3.5 text-blue-400 shrink-0 animate-spin" />;
+  if (status === "failed")
+    return <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />;
+  return <Clock className="w-3.5 h-3.5 text-gray-500 shrink-0" />;
 }
 
-function timeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+type ActivityItem =
+  | {
+      time: Date;
+      type: "email";
+      status: string;
+      company: string;
+      source?: undefined;
+      found?: undefined;
+      newCount?: undefined;
+    }
+  | {
+      time: Date;
+      type: "job";
+      status: string;
+      source: string;
+      found: number;
+      newCount: number;
+      company?: undefined;
+    };
+
+function mergeActivity(
+  emails: { status: string; updatedAt: Date; company: { name: string } }[],
+  jobs: {
+    sourceType: string;
+    sourceName: string | null;
+    status: string;
+    totalFound: number;
+    totalNew: number;
+    createdAt: Date;
+  }[]
+): ActivityItem[] {
+  const items: ActivityItem[] = [
+    ...emails.map((e) => ({
+      time: new Date(e.updatedAt),
+      type: "email" as const,
+      status: e.status,
+      company: e.company.name,
+    })),
+    ...jobs.map((j) => ({
+      time: new Date(j.createdAt),
+      type: "job" as const,
+      status: j.status,
+      source: j.sourceName || j.sourceType,
+      found: j.totalFound,
+      newCount: j.totalNew,
+    })),
+  ];
+  return items.sort((a, b) => b.time.getTime() - a.time.getTime());
 }

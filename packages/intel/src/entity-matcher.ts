@@ -4,14 +4,72 @@
  * When a news article mentions "ABC Pharma" and we have "ABC Pharma" in our
  * Company table, we link them. This creates the "your pipeline company is
  * in the news" feature.
+ *
+ * Matching strategy (in order of confidence):
+ * 1. Exact match (after normalization)
+ * 2. Normalized match (strip suffixes like Inc, Ltd, GmbH, etc.)
+ * 3. Contains match (one name contains the other, min 4 chars)
+ * 4. Token overlap (Jaccard similarity >= 0.6 on meaningful words)
  */
 
 import { prisma } from "@agency/db";
 import type { ProcessedNewsItem } from "./summarizer";
 
+/** Corporate suffixes to strip for fuzzy matching */
+const CORP_SUFFIXES =
+  /\b(inc\.?|incorporated|corp\.?|corporation|ltd\.?|limited|llc|l\.l\.c\.?|gmbh|ag|s\.?a\.?|s\.?r\.?l\.?|plc|co\.?|company|group|holdings?|international|intl\.?|enterprises?|pharm(?:a|aceuticals?)?|laboratories|labs?|med(?:ical)?|healthcare|health\s?care|bio(?:tech|sciences?|logics?)?|therapeutics?|diagnostics?|devices?|sciences?)\b/gi;
+
+/** Words too common to be meaningful in matching */
+const STOP_WORDS = new Set([
+  "the", "and", "of", "for", "in", "a", "an", "to", "at", "by", "on",
+  "de", "la", "le", "el", "del", "das", "die", "der", "und",
+]);
+
+/**
+ * Normalize a company name for matching:
+ * lowercase, strip suffixes, trim extra whitespace and punctuation.
+ */
+export function normalizeCompanyName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[''`]/g, "'")
+    .replace(/[""]/g, '"')
+    .replace(CORP_SUFFIXES, "")
+    .replace(/[.,\-–—&+!@#$%^*()\[\]{}|\\/<>:;"']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Extract meaningful tokens from a normalized name */
+function tokens(normalized: string): string[] {
+  return normalized
+    .split(/\s+/)
+    .filter((w) => w.length >= 2 && !STOP_WORDS.has(w));
+}
+
+/** Jaccard similarity between two token sets */
+function jaccardSimilarity(a: string[], b: string[]): number {
+  if (a.length === 0 || b.length === 0) return 0;
+  const setA = new Set(a);
+  const setB = new Set(b);
+  let intersection = 0;
+  for (const token of setA) {
+    if (setB.has(token)) intersection++;
+  }
+  const union = setA.size + setB.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+type CompanyEntry = {
+  id: string;
+  name: string;
+  normalized: string;
+  tokens: string[];
+};
+
 /**
  * Match processed news items to companies in the database.
- * Uses fuzzy matching on entity names extracted by AI.
+ * Uses multi-level fuzzy matching on entity names extracted by AI.
  *
  * Returns the items with companyId filled in where matched.
  */
@@ -23,7 +81,7 @@ export async function matchEntitiesToCompanies(
   const allEntities = new Set<string>();
   for (const item of items) {
     for (const entity of item.entities) {
-      allEntities.add(entity.toLowerCase().trim());
+      allEntities.add(entity);
     }
   }
 
@@ -31,50 +89,74 @@ export async function matchEntitiesToCompanies(
     return items.map((item) => ({ ...item, companyId: null }));
   }
 
-  // Fetch all company names for this tenant (for matching)
+  // Fetch all company names for this tenant
   const companies = await prisma.company.findMany({
     where: { tenantId },
     select: { id: true, name: true },
   });
 
-  // Build a lookup map: lowercase name → company id
-  const companyMap = new Map<string, string>();
-  for (const company of companies) {
-    companyMap.set(company.name.toLowerCase().trim(), company.id);
+  // Pre-compute normalized forms
+  const companyEntries: CompanyEntry[] = companies.map((c) => {
+    const norm = normalizeCompanyName(c.name);
+    return {
+      id: c.id,
+      name: c.name,
+      normalized: norm,
+      tokens: tokens(norm),
+    };
+  });
+
+  // Build exact-match map on normalized names
+  const exactMap = new Map<string, string>();
+  for (const entry of companyEntries) {
+    exactMap.set(entry.normalized, entry.id);
   }
 
   // Match each item's entities against company names
   return items.map((item) => {
-    let matchedCompanyId: string | null = null;
+    const companyId = matchBestCompany(item.entities, companyEntries, exactMap);
+    return { ...item, companyId };
+  });
+}
 
-    for (const entity of item.entities) {
-      const entityLower = entity.toLowerCase().trim();
+/** Try to match an entity list to a company, returning the best match or null */
+function matchBestCompany(
+  entities: string[],
+  companies: CompanyEntry[],
+  exactMap: Map<string, string>
+): string | null {
+  for (const entity of entities) {
+    const entityNorm = normalizeCompanyName(entity);
+    if (!entityNorm || entityNorm.length < 2) continue;
 
-      // Exact match
-      if (companyMap.has(entityLower)) {
-        matchedCompanyId = companyMap.get(entityLower)!;
-        break;
-      }
+    // Level 1: Exact match on normalized name
+    const exact = exactMap.get(entityNorm);
+    if (exact) return exact;
 
-      // Partial match: entity contains company name or vice versa
-      for (const [companyName, companyId] of companyMap) {
+    const entityTokens = tokens(entityNorm);
+
+    for (const company of companies) {
+      // Level 2: Contains match (with min length guard)
+      if (entityNorm.length >= 4 && company.normalized.length >= 4) {
         if (
-          entityLower.includes(companyName) ||
-          companyName.includes(entityLower)
+          entityNorm.includes(company.normalized) ||
+          company.normalized.includes(entityNorm)
         ) {
-          // Only match if both are at least 4 chars (avoid false positives)
-          if (entityLower.length >= 4 && companyName.length >= 4) {
-            matchedCompanyId = companyId;
-            break;
-          }
+          return company.id;
         }
       }
 
-      if (matchedCompanyId) break;
+      // Level 3: Token overlap (Jaccard >= 0.6)
+      if (entityTokens.length >= 2 && company.tokens.length >= 2) {
+        const similarity = jaccardSimilarity(entityTokens, company.tokens);
+        if (similarity >= 0.6) {
+          return company.id;
+        }
+      }
     }
+  }
 
-    return { ...item, companyId: matchedCompanyId };
-  });
+  return null;
 }
 
 /**
@@ -96,5 +178,5 @@ export function topicToQueries(topic: {
     }
   }
 
-  return queries.slice(0, 10); // Max 10 queries per topic
+  return queries.slice(0, 10);
 }

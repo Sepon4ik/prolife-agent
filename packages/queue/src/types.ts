@@ -64,6 +64,32 @@ export type ProlifeEvents = {
     };
   };
 
+  // Intel pipeline
+  "prolife/intel.run": {
+    data: {
+      tenantId: string;
+      topicId: string;
+    };
+  };
+
+  // News collection cron
+  "prolife/news.collect": {
+    data: Record<string, never>;
+  };
+
+  // News content extraction + translation backfill
+  "prolife/news.backfill-content": {
+    data: Record<string, never>;
+  };
+
+  // News entity → company enrichment
+  "prolife/news.enrich-companies": {
+    data: {
+      tenantId: string;
+      newsItemIds: string[];
+    };
+  };
+
   // Handoff to sales
   "prolife/sales.handoff": {
     data: {

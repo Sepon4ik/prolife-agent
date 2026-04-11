@@ -7,6 +7,13 @@ interface OutreachParams {
   companyType: string;
   categories: string[];
   language?: string;
+  /** Recent news about this company for personalization */
+  newsContext?: {
+    title: string;
+    category: string;
+    summary: string | null;
+    publishedAt: string | null;
+  };
 }
 
 const OUTREACH_SYSTEM_PROMPT = `You are writing a professional outreach email on behalf of ProLife, a Swiss company specializing in:
@@ -22,6 +29,7 @@ The email should be:
 - Include a clear call to action (schedule a call)
 - Mention Swiss quality and innovation
 - Reference the recipient's market expertise
+- If recent news about the company is provided, subtly reference it to show you're paying attention to their business (1 sentence max, don't overdo it)
 
 Write ONLY the email body in PLAIN TEXT. No HTML tags, no formatting. No subject line, no greeting format instructions. Keep it short — 100-150 words max. Write like a human typed it in Gmail, not like a marketing template.`;
 
@@ -44,7 +52,8 @@ export async function generateOutreachEmail(params: OutreachParams): Promise<{
 - Country: ${params.country}
 - Company type: ${params.companyType}
 - Their categories: ${params.categories.join(", ")}
-- Language: ${params.language ?? "English"}
+- Language: ${params.language ?? "English"}${params.newsContext ? `
+- Recent news about them: "${params.newsContext.title}" (${params.newsContext.category}, ${params.newsContext.publishedAt ?? "recent"})${params.newsContext.summary ? ` — ${params.newsContext.summary}` : ""}` : ""}
 
 The email should feel personal and reference their specific market.`,
       },
