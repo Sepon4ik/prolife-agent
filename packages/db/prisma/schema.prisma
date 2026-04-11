@@ -84,22 +84,24 @@ model Tenant {
 
   // Kill switch: ALL outreach is blocked until explicitly enabled.
   // Email, LinkedIn, follow-ups — nothing goes out while this is false.
-  outreachEnabled Boolean @default(false)
+  outreachEnabled  Boolean @default(false)
+  dailyRevealLimit Int     @default(30)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   companies        Company[]
   scrapingJobs     ScrapingJob[]
-  users            User[]
+  users            ProlifeUser[]
   mailboxes        Mailbox[]
   linkedInAccounts LinkedInAccount[]
   topics           Topic[]
   newsItems        NewsItem[]
   alerts           Alert[]
+  revealLogs       RevealLog[]
 }
 
-model User {
+model ProlifeUser {
   id        String   @id @default(cuid())
   tenantId  String
   email     String   @unique
@@ -108,9 +110,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  revealLogs RevealLog[]
 
   @@index([tenantId])
+  @@map("prolife_user")
 }
 
 model Company {
@@ -144,9 +148,10 @@ model Company {
   sourceUrl  String?
   sourceExhibition String?
 
-  contacts  Contact[]
-  emails    Email[]
-  newsItems NewsItem[]
+  contacts   Contact[]
+  emails     Email[]
+  newsItems  NewsItem[]
+  revealLogs RevealLog[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -442,3 +447,42 @@ model Alert {
 
   @@index([tenantId, isActive])
 }
+
+// ── Data Protection: Reveal Tracking ──
+
+model RevealLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  companyId String
+  contactId String?  // null = company-level reveal
+  createdAt DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  user    ProlifeUser @relation(fields: [userId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([tenantId, userId, createdAt])
+  @@index([companyId])
+}
+
+// ── Intel: Feed Health Monitoring ──
+
+model FeedHealthLog {
+  id             String   @id @default(cuid())
+  feedUrl        String
+  feedName       String
+  status         String   // success, fail, timeout
+  itemCount      Int      @default(0)
+  errorMessage   String?
+  responseTimeMs Int?
+  collectedAt    DateTime @default(now())
+
+  @@index([feedUrl, collectedAt])
+  @@index([collectedAt])
+}
+
+// ── Auth ──
+// better-auth tables (user, session, account, verification) are managed
+// directly by better-auth via raw pg — NOT in this Prisma schema.
+// See packages/auth/src/index.ts for config.

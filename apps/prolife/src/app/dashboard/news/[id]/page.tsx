@@ -12,6 +12,7 @@ import {
   Bookmark,
   Share2,
   Newspaper,
+  Loader2,
   Handshake,
   Rocket,
   Shield,
@@ -247,19 +248,13 @@ export default async function NewsDetailPage({
         </div>
       ) : (
         <div className="mb-8 p-6 rounded-lg border border-white/5 bg-white/[0.01] text-center">
-          <Newspaper className="w-8 h-8 text-gray-700 mx-auto mb-2" />
-          <p className="text-sm text-gray-500 mb-3">
-            Контент еще не загружен
+          <Loader2 className="w-8 h-8 text-gray-700 mx-auto mb-2 animate-spin" />
+          <p className="text-sm text-gray-500 mb-1">
+            Загружается...
           </p>
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-primary-400 hover:text-primary-300 transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            Читать на сайте источника
-          </a>
+          <p className="text-xs text-gray-600">
+            Контент загружается автоматически. Обновите страницу через несколько минут.
+          </p>
         </div>
       )}
 

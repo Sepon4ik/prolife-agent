@@ -58,7 +58,7 @@ export const newsCollect = inngest.createFunction(
     const uniqueQueries = [...new Set(allQueries)].slice(0, 30);
 
     // Step 3: Aggregate news from all sources
-    const rawItems = await step.run("aggregate-news", async () => {
+    const aggregateResult = await step.run("aggregate-news", async () => {
       return aggregateNews(uniqueQueries, {
         includeRSS: true,
         includeFDA: true,
@@ -67,6 +67,24 @@ export const newsCollect = inngest.createFunction(
         maxPerSource: 8,
       });
     });
+
+    const rawItems = aggregateResult.items;
+
+    // Step 3b: Save feed health logs
+    if (aggregateResult.feedHealth.length > 0) {
+      await step.run("save-feed-health", async () => {
+        await prisma.feedHealthLog.createMany({
+          data: aggregateResult.feedHealth.map((h) => ({
+            feedUrl: h.feedUrl,
+            feedName: h.feedName,
+            status: h.status,
+            itemCount: h.itemCount,
+            errorMessage: h.errorMessage ?? null,
+            responseTimeMs: h.responseTimeMs,
+          })),
+        });
+      });
+    }
 
     if (rawItems.length === 0) {
       return { success: true, stats: { raw: 0, saved: 0 } };

@@ -56,13 +56,29 @@ export async function POST() {
     const uniqueQueries = [...new Set(allQueries)].slice(0, 30);
 
     // 2. Aggregate news from all sources
-    const rawItems = await aggregateNews(uniqueQueries, {
+    const aggregateResult = await aggregateNews(uniqueQueries, {
       includeRSS: true,
       includeFDA: true,
       includeClinicalTrials: true,
       includeEMA: true,
       maxPerSource: 8,
     });
+
+    const rawItems = aggregateResult.items;
+
+    // 2b. Save feed health logs
+    if (aggregateResult.feedHealth.length > 0) {
+      await prisma.feedHealthLog.createMany({
+        data: aggregateResult.feedHealth.map((h) => ({
+          feedUrl: h.feedUrl,
+          feedName: h.feedName,
+          status: h.status,
+          itemCount: h.itemCount,
+          errorMessage: h.errorMessage ?? null,
+          responseTimeMs: h.responseTimeMs,
+        })),
+      });
+    }
 
     if (rawItems.length === 0) {
       return NextResponse.json({

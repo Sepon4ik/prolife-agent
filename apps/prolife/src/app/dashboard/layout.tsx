@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Building2,
@@ -10,8 +10,10 @@ import {
   Newspaper,
   Settings,
   Zap,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@agency/ui";
+import { useSession, signOut } from "@agency/auth/client";
 
 const navItems = [
   { label: "Центр управления", href: "/dashboard", icon: LayoutDashboard },
@@ -28,6 +30,13 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { data: session } = useSession();
+
+  async function handleLogout() {
+    await signOut();
+    router.push("/login");
+  }
 
   return (
     <div className="flex min-h-screen bg-dark">
@@ -81,9 +90,29 @@ export default function DashboardLayout({
         </nav>
 
         <div className="p-3 border-t border-white/5">
-          <div className="text-[10px] text-gray-600 text-center">
-            ProLife AG &middot; Swiss MedTech
-          </div>
+          {session?.user ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs text-gray-300 truncate">
+                  {session.user.name ?? session.user.email}
+                </p>
+                <p className="text-[10px] text-gray-600 truncate">
+                  {session.user.email}
+                </p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-gray-600 hover:text-gray-300 transition-colors shrink-0 p-1"
+                title="Выйти"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="text-[10px] text-gray-600 text-center">
+              ProLife AG &middot; Swiss MedTech
+            </div>
+          )}
         </div>
       </aside>
 

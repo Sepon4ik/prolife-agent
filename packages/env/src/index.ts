@@ -27,6 +27,8 @@ const prolifeEnvSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+  BETTER_AUTH_SECRET: z.string().min(16).optional(),
+  BETTER_AUTH_URL: z.string().url().optional(),
   PROXY_URLS: z.string().optional(),
 });
 

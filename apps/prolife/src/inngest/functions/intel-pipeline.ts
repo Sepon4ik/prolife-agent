@@ -72,7 +72,7 @@ export const intelPipeline = inngest.createFunction(
     const uniqueQueries = [...new Set(allQueries)].slice(0, 30);
 
     // Step 3: Aggregate from ALL sources (RSS + FDA + ClinicalTrials + EMA)
-    const rawNews = await step.run("aggregate-all", async () => {
+    const aggregateResult = await step.run("aggregate-all", async () => {
       return aggregateNews(uniqueQueries, {
         includeRSS: true,
         includeFDA: true,
@@ -81,6 +81,24 @@ export const intelPipeline = inngest.createFunction(
         maxPerSource: 8,
       });
     });
+
+    const rawNews = aggregateResult.items;
+
+    // Step 3b: Save feed health logs
+    if (aggregateResult.feedHealth.length > 0) {
+      await step.run("save-feed-health", async () => {
+        await prisma.feedHealthLog.createMany({
+          data: aggregateResult.feedHealth.map((h) => ({
+            feedUrl: h.feedUrl,
+            feedName: h.feedName,
+            status: h.status,
+            itemCount: h.itemCount,
+            errorMessage: h.errorMessage ?? null,
+            responseTimeMs: h.responseTimeMs,
+          })),
+        });
+      });
+    }
 
     if (rawNews.length === 0) {
       return { skipped: true, reason: "No news found", queriesUsed: uniqueQueries.length };
@@ -449,7 +467,7 @@ export const intelManualTrigger = inngest.createFunction(
       });
     });
 
-    const rawNews = await step.run("aggregate", async () => {
+    const manualAggregateResult = await step.run("aggregate", async () => {
       const queries = topicToQueries(topic);
       return aggregateNews(queries, {
         includeRSS: true,
@@ -459,6 +477,24 @@ export const intelManualTrigger = inngest.createFunction(
         maxPerSource: 10,
       });
     });
+
+    const rawNews = manualAggregateResult.items;
+
+    // Save feed health logs from manual run
+    if (manualAggregateResult.feedHealth.length > 0) {
+      await step.run("save-feed-health", async () => {
+        await prisma.feedHealthLog.createMany({
+          data: manualAggregateResult.feedHealth.map((h) => ({
+            feedUrl: h.feedUrl,
+            feedName: h.feedName,
+            status: h.status,
+            itemCount: h.itemCount,
+            errorMessage: h.errorMessage ?? null,
+            responseTimeMs: h.responseTimeMs,
+          })),
+        });
+      });
+    }
 
     const processed = await step.run("summarize", async () => {
       return summarizeNewsItems(rawNews);
@@ -511,6 +547,6 @@ export const intelManualTrigger = inngest.createFunction(
       return matches.length;
     });
 
-    return { topic: topic.name, fetched: rawNews.length, saved, alerts };
+    return { topic: topic.name, fetched: rawNews.length, saved, alerts, feedHealth: manualAggregateResult.feedHealth.length };
   }
 );

@@ -29,6 +29,20 @@ export interface RawNewsItem {
   sourceUrl?: string;
 }
 
+export interface FeedHealth {
+  feedUrl: string;
+  feedName: string;
+  status: "success" | "fail" | "timeout";
+  itemCount: number;
+  errorMessage?: string;
+  responseTimeMs: number;
+}
+
+export interface AggregateResult {
+  items: RawNewsItem[];
+  feedHealth: FeedHealth[];
+}
+
 // ── Google News RSS (free, no key) ──
 
 export async function fetchGoogleNewsRSS(
@@ -290,10 +304,11 @@ export async function aggregateNews(
     includeEMA?: boolean;
     maxPerSource?: number;
   } = {}
-): Promise<RawNewsItem[]> {
+): Promise<AggregateResult> {
   const maxPer = options.maxPerSource ?? 10;
   const seen = new Set<string>();
   const all: RawNewsItem[] = [];
+  const feedHealth: FeedHealth[] = [];
 
   const addItems = (items: RawNewsItem[]) => {
     for (const item of items) {
@@ -319,12 +334,35 @@ export async function aggregateNews(
     await delay(500);
   }
 
-  // ── Industry RSS feeds (23 feeds) ──
+  // ── Industry RSS feeds — with health tracking ──
   if (options.includeRSS !== false) {
     const feeds = getPharmaRSSFeeds();
-    const feedResults = await Promise.allSettled(
-      feeds.map((feed) => fetchRSSFeed(feed.url, feed.name, maxPer))
-    );
+    const feedPromises = feeds.map(async (feed) => {
+      const start = Date.now();
+      try {
+        const items = await fetchRSSFeed(feed.url, feed.name, maxPer);
+        feedHealth.push({
+          feedUrl: feed.url,
+          feedName: feed.name,
+          status: "success",
+          itemCount: items.length,
+          responseTimeMs: Date.now() - start,
+        });
+        return items;
+      } catch (err) {
+        const isTimeout = err instanceof Error && err.name === "AbortError";
+        feedHealth.push({
+          feedUrl: feed.url,
+          feedName: feed.name,
+          status: isTimeout ? "timeout" : "fail",
+          itemCount: 0,
+          errorMessage: err instanceof Error ? err.message : "Unknown error",
+          responseTimeMs: Date.now() - start,
+        });
+        return [];
+      }
+    });
+    const feedResults = await Promise.allSettled(feedPromises);
     for (const result of feedResults) {
       if (result.status === "fulfilled") addItems(result.value);
     }
@@ -350,7 +388,7 @@ export async function aggregateNews(
     }
   }
 
-  return all;
+  return { items: all, feedHealth };
 }
 
 /**

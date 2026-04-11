@@ -14,8 +14,6 @@ import {
   ArrowLeft,
   ExternalLink,
   Mail,
-  Phone,
-  Linkedin,
   Calendar,
   Globe,
   Building2,
@@ -33,6 +31,7 @@ import {
   Reply,
   Clock,
 } from "lucide-react";
+import { RevealContacts } from "./reveal-contacts";
 
 export const dynamic = "force-dynamic";
 
@@ -159,7 +158,7 @@ export default async function CompanyDetailPage({
   const company = await prisma.company.findUnique({
     where: { id: params.id },
     include: {
-      contacts: { orderBy: { isPrimary: "desc" } },
+      _count: { select: { contacts: true } },
       emails: {
         orderBy: { createdAt: "desc" },
         include: {
@@ -173,11 +172,11 @@ export default async function CompanyDetailPage({
 
   const scoreBreakdown = calculateScoreBreakdown(company as unknown as Record<string, unknown>);
   const aiSummary = generateAISummary(company as unknown as Record<string, unknown>);
-  const hasContactsWithEmail = company.contacts.some((c) => c.email);
+  const hasContacts = company._count.contacts > 0;
   const nextActions = getNextActions(
     company as unknown as Record<string, unknown>,
     company.emails.length,
-    hasContactsWithEmail
+    hasContacts
   );
 
   let hostname: string | null = null;
@@ -248,7 +247,7 @@ export default async function CompanyDetailPage({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
             <MiniMetric label="Приоритет" value={company.priority === "A" ? "Горячий" : company.priority === "B" ? "Теплый" : "Холодный"} />
             <MiniMetric label="Писем отправлено" value={String(company.emails.length)} />
-            <MiniMetric label="Контакты" value={String(company.contacts.length)} />
+            <MiniMetric label="Контакты" value={String(company._count.contacts)} />
             <MiniMetric label="Обновлено" value={timeAgo(new Date(company.updatedAt))} />
           </div>
 
@@ -431,112 +430,13 @@ export default async function CompanyDetailPage({
 
         {/* Right — contacts + emails (2 cols) */}
         <div className="lg:col-span-2 space-y-5">
-          {/* Contacts */}
+          {/* Contacts — behind reveal */}
           <Card>
             <CardContent>
-              <h2 className="text-sm font-semibold text-white mb-3">
-                Контакты ({company.contacts.length})
-              </h2>
-              {company.contacts.length === 0 ? (
-                <div className="py-6 text-center">
-                  <Users className="w-8 h-8 text-gray-700 mx-auto mb-2" />
-                  <p className="text-gray-600 text-xs">Контактов пока нет</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {company.contacts.map((contact) => (
-                    <div
-                      key={contact.id}
-                      className="p-3 rounded-lg bg-white/[0.02] border border-white/5"
-                    >
-                      <div className="flex items-start gap-3">
-                        {contact.photoUrl ? (
-                          <img
-                            src={contact.photoUrl}
-                            alt={contact.name}
-                            className="w-9 h-9 rounded-full object-cover border border-white/10 shrink-0"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-dark-tertiary flex items-center justify-center shrink-0 border border-white/10">
-                            <span className="text-[10px] text-gray-500 font-medium">
-                              {contact.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .slice(0, 2)
-                                .toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-white truncate">
-                              {contact.name}
-                            </span>
-                            {contact.isPrimary && (
-                              <span className="text-[9px] px-1 py-0.5 rounded bg-primary-500/20 text-primary-400 shrink-0">
-                                PRIMARY
-                              </span>
-                            )}
-                          </div>
-                          {contact.title && (
-                            <div className="text-xs text-gray-500 mt-0.5 truncate">
-                              {contact.title}
-                            </div>
-                          )}
-                          {contact.bio && (
-                            <div className="text-[11px] text-gray-500 mt-1 leading-relaxed italic line-clamp-2">
-                              &ldquo;{contact.bio}&rdquo;
-                            </div>
-                          )}
-                          <div className="flex items-center gap-3 mt-2">
-                            {contact.email && (
-                              <a
-                                href={`mailto:${contact.email}`}
-                                className="text-gray-500 hover:text-primary-400 transition-colors"
-                                title={contact.email}
-                              >
-                                <Mail className="w-3.5 h-3.5" />
-                              </a>
-                            )}
-                            {contact.phone && (
-                              <a
-                                href={`tel:${contact.phone}`}
-                                className="text-gray-500 hover:text-primary-400 transition-colors"
-                                title={contact.phone}
-                              >
-                                <Phone className="w-3.5 h-3.5" />
-                              </a>
-                            )}
-                            {contact.linkedin && (
-                              <a
-                                href={contact.linkedin}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-gray-500 hover:text-blue-400 transition-colors"
-                              >
-                                <Linkedin className="w-3.5 h-3.5" />
-                              </a>
-                            )}
-                          </div>
-                          {contact.languages.length > 0 && (
-                            <div className="flex gap-1 mt-2">
-                              {contact.languages.map((lang) => (
-                                <span
-                                  key={lang}
-                                  className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-gray-500"
-                                >
-                                  {lang}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <RevealContacts
+                companyId={company.id}
+                contactCount={company._count.contacts}
+              />
             </CardContent>
           </Card>
 

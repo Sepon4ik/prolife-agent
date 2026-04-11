@@ -34,7 +34,7 @@ export const newsBackfillContent = inngest.createFunction(
           summary: true,
         },
         orderBy: { relevanceScore: "desc" },
-        take: 20, // Process 20 per run to keep costs reasonable
+        take: 50, // Process 50 per run (increased from 20 for faster coverage)
       });
     });
 
@@ -101,6 +101,27 @@ export const newsBackfillContent = inngest.createFunction(
           }
         }
       });
+    }
+
+    // Step 4: Eager backfill — if many items were processed, check for more after a delay
+    if (itemsNeedingContent.length >= 30) {
+      await step.sleep("eager-backfill-delay", "5m");
+
+      const stillRemaining = await step.run("check-remaining", async () => {
+        return prisma.newsItem.count({
+          where: {
+            fullContent: null,
+            translatedTitle: null,
+          },
+        });
+      });
+
+      if (stillRemaining > 0) {
+        await step.sendEvent("trigger-eager-backfill", {
+          name: "prolife/news.backfill-content",
+          data: { eager: true },
+        });
+      }
     }
 
     return {

@@ -5,6 +5,8 @@ export {
   fetchRSSFeed,
   getPharmaRSSFeeds,
   type RawNewsItem,
+  type FeedHealth,
+  type AggregateResult,
 } from "./aggregator";
 
 export {

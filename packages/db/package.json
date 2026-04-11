@@ -4,6 +4,11 @@
   "private": true,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./dal/reveals": "./src/dal/reveals.ts",
+    "./dal/companies": "./src/dal/companies.ts"
+  },
   "scripts": {
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
