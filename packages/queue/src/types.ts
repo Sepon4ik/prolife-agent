@@ -30,6 +30,16 @@ export type ProlifeEvents = {
     };
   };
 
+  // Contact enrichment waterfall
+  "prolife/enrich.contacts": {
+    data: {
+      tenantId: string;
+      companyId: string;
+      companyDomain: string;
+      companyName: string;
+    };
+  };
+
   // Scoring
   "prolife/score.calculate": {
     data: {

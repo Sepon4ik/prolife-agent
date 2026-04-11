@@ -1,243 +1,210 @@
-import { prisma } from "@agency/db";
+import {
+  prisma,
+  Prisma,
+  type PipelineStage,
+  getRegion,
+  REGIONS,
+  getCountriesInRegion,
+} from "@agency/db";
+import { Suspense } from "react";
 import { AddCompanyForm } from "./add-company-form";
-import Link from "next/link";
-import {
-  KpiCard,
-  Card,
-  ScoreBadge,
-  StatusBadge,
-  PriorityBadge,
-  EmptyState,
-  timeAgo,
-} from "@agency/ui";
-import {
-  Building2,
-  Sparkles,
-  Star,
-  ThumbsUp,
-  Search,
-} from "lucide-react";
+import { PipelineToolbar } from "./pipeline-toolbar";
+import { CompaniesTable } from "./companies-table";
+import { CountrySidebar } from "./country-sidebar";
+import { Card, EmptyState } from "@agency/ui";
+import { Search } from "lucide-react";
+import type {
+  PipelineCompany,
+  StageCounts,
+  RegionGroup,
+  CountryCount,
+} from "./types";
 
 export const dynamic = "force-dynamic";
 
-export default async function CompaniesPage() {
-  let companies: {
-    id: string;
-    name: string;
-    website: string | null;
-    country: string;
-    type: string;
-    priority: string;
-    score: number;
-    status: string;
-    geoPriority: string | null;
-    updatedAt: Date;
-    contacts: { name: string; title: string | null; email: string | null }[];
-    _count: { emails: number };
-  }[] = [];
+interface PageProps {
+  searchParams: {
+    stage?: string;
+    country?: string;
+    region?: string;
+    q?: string;
+  };
+}
+
+export default async function CompaniesPage({ searchParams }: PageProps) {
+  const activeStage = (searchParams.stage ?? "NEW") as PipelineStage;
+
+  // Base filter: not deleted
+  const baseWhere: Prisma.CompanyWhereInput = { deletedAt: null };
+
+  // Country/region filter for both sidebar counts and table
+  let geoWhere: Prisma.CompanyWhereInput = {};
+  if (searchParams.country) {
+    geoWhere = { country: searchParams.country };
+  } else if (searchParams.region) {
+    const regionCountries = getCountriesInRegion(searchParams.region);
+    if (regionCountries.length > 0) {
+      geoWhere = { country: { in: regionCountries } };
+    }
+  }
+
+  // Search filter
+  let searchWhere: Prisma.CompanyWhereInput = {};
+  if (searchParams.q) {
+    searchWhere = { name: { contains: searchParams.q, mode: "insensitive" } };
+  }
+
+  let companies: PipelineCompany[] = [];
+  let stageCounts: StageCounts = { NEW: 0, DEEP_RESEARCH: 0, LAST_STAGE: 0, TRASH: 0 };
+  let regionGroups: RegionGroup[] = [];
+  let totalCount = 0;
   let dbError: string | null = null;
 
   try {
-    companies = await prisma.company.findMany({
-      select: {
-        id: true,
-        name: true,
-        website: true,
-        country: true,
-        type: true,
-        priority: true,
-        score: true,
-        status: true,
-        geoPriority: true,
-        updatedAt: true,
-        contacts: {
-          where: { isPrimary: true },
-          take: 1,
-          select: { name: true, title: true, email: true },
+    // Parallel queries: stage counts, companies, country counts
+    const [stageCountsRaw, raw, countryCounts] = await Promise.all([
+      // Stage counts (filtered by geo but not by stage/search)
+      prisma.company.groupBy({
+        by: ["stage"],
+        where: { ...baseWhere, ...geoWhere },
+        _count: true,
+      }),
+      // Companies for current stage
+      prisma.company.findMany({
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          country: true,
+          priority: true,
+          score: true,
+          status: true,
+          stage: true,
+          salesStatus: true,
+          trashReason: true,
+          updatedAt: true,
+          _count: { select: { emails: true } },
         },
-        _count: { select: { emails: true } },
-      },
-      where: { deletedAt: null },
-      orderBy: [{ priority: "asc" }, { score: "desc" }],
-      take: 100,
-    });
+        where: {
+          ...baseWhere,
+          ...geoWhere,
+          ...searchWhere,
+          stage: activeStage,
+        },
+        orderBy: [{ score: "desc" }],
+        take: 200,
+      }),
+      // Country counts for sidebar (all stages, no search filter)
+      prisma.company.groupBy({
+        by: ["country"],
+        where: baseWhere,
+        _count: true,
+        orderBy: { _count: { country: "desc" } },
+      }),
+    ]);
+
+    // Map stage counts
+    for (const row of stageCountsRaw) {
+      stageCounts[row.stage] = row._count;
+    }
+
+    // Map companies
+    companies = raw.map((c) => ({
+      id: c.id,
+      name: c.name,
+      type: c.type,
+      country: c.country,
+      priority: c.priority,
+      score: c.score,
+      status: c.status,
+      stage: c.stage,
+      salesStatus: c.salesStatus,
+      trashReason: c.trashReason,
+      emailCount: c._count.emails,
+      updatedAt: c.updatedAt.toISOString(),
+    }));
+
+    // Build region groups for sidebar
+    const regionMap = new Map<string, CountryCount[]>();
+    for (const regionName of Object.keys(REGIONS)) {
+      regionMap.set(regionName, []);
+    }
+    regionMap.set("OTHER", []);
+
+    for (const row of countryCounts) {
+      const region = getRegion(row.country);
+      const list = regionMap.get(region) ?? regionMap.get("OTHER")!;
+      list.push({ country: row.country, count: row._count });
+      totalCount += row._count;
+    }
+
+    regionGroups = Array.from(regionMap.entries())
+      .filter(([, countries]) => countries.length > 0)
+      .map(([region, countries]) => ({
+        region,
+        countries,
+        total: countries.reduce((sum, c) => sum + c.count, 0),
+      }));
   } catch (error: unknown) {
     dbError = error instanceof Error ? error.message : "Unknown error";
     console.error("Companies DB error:", error);
   }
 
-  const stats = {
-    total: companies.length,
-    enriched: companies.filter((c) => c.status !== "RAW").length,
-    priorityA: companies.filter((c) => c.priority === "A").length,
-    interested: companies.filter((c) => c.status === "INTERESTED").length,
-  };
-
   return (
-    <div className="p-6 lg:p-8 max-w-[1400px]">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-6 lg:p-8 max-w-[1600px]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-bold text-white">Пайплайн</h1>
+          <h1 className="text-xl font-bold text-white">Pipeline</h1>
           <p className="text-gray-500 text-xs mt-0.5">
-            {stats.total} дистрибьюторов и потенциальных партнеров
+            {totalCount} companies across{" "}
+            {regionGroups.reduce((s, r) => s + r.countries.length, 0)} countries
           </p>
         </div>
         <AddCompanyForm />
       </div>
 
       {dbError && (
-        <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-          <p className="text-red-400 text-sm font-medium">Ошибка базы данных</p>
+        <div className="mb-5 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+          <p className="text-red-400 text-sm font-medium">Database error</p>
           <p className="text-red-300/70 text-xs mt-1">{dbError}</p>
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <KpiCard
-          title="Всего"
-          value={stats.total}
-          icon={<Building2 className="w-4 h-4" />}
-        />
-        <KpiCard
-          title="Обогащено"
-          value={stats.enriched}
-          icon={<Sparkles className="w-4 h-4" />}
-        />
-        <KpiCard
-          title="Приоритет A"
-          value={stats.priorityA}
-          icon={<Star className="w-4 h-4" />}
-        />
-        <KpiCard
-          title="Заинтересованы"
-          value={stats.interested}
-          icon={<ThumbsUp className="w-4 h-4" />}
-        />
+      {/* Stage tabs */}
+      <div className="mb-4">
+        <Suspense>
+          <PipelineToolbar stageCounts={stageCounts} />
+        </Suspense>
       </div>
 
-      {/* Table — Layer 1: 5 key columns */}
-      {companies.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon={<Search className="w-10 h-10" />}
-            title="Компаний пока нет"
-            description="Запустите скрейпинг из раздела Источники для поиска компаний."
-          />
-        </Card>
-      ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/5 text-gray-500 text-left text-xs">
-                  <th className="px-5 py-3 font-medium">Компания</th>
-                  <th className="px-4 py-3 font-medium w-16 text-center">Балл</th>
-                  <th className="px-4 py-3 font-medium">Статус</th>
-                  <th className="px-4 py-3 font-medium">Контакт</th>
-                  <th className="px-4 py-3 font-medium text-right">Активность</th>
-                </tr>
-              </thead>
-              <tbody>
-                {companies.map((company) => {
-                  const contact = company.contacts[0];
-                  let hostname: string | null = null;
-                  try {
-                    if (company.website)
-                      hostname = new URL(company.website).hostname;
-                  } catch {
-                    /* skip */
-                  }
+      {/* Main layout: sidebar + table */}
+      <div className="flex gap-4">
+        {/* Country sidebar */}
+        <Suspense>
+          <CountrySidebar regions={regionGroups} totalCount={totalCount} />
+        </Suspense>
 
-                  return (
-                    <tr
-                      key={company.id}
-                      className="border-b border-white/[0.03] hover:bg-white/[0.03] transition-colors group"
-                    >
-                      {/* Company — name, type, country, priority */}
-                      <td className="px-5 py-3">
-                        <Link
-                          href={`/dashboard/companies/${company.id}`}
-                          className="block"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-white group-hover:text-primary-400 transition-colors truncate">
-                                  {company.name}
-                                </span>
-                                <PriorityBadge priority={company.priority} />
-                              </div>
-                              <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
-                                <span>{company.type.replace(/_/g, " ")}</span>
-                                <span className="text-gray-700">·</span>
-                                <span>{company.country}</span>
-                                {hostname && (
-                                  <>
-                                    <span className="text-gray-700">·</span>
-                                    <span className="text-gray-600 truncate max-w-[120px]">
-                                      {hostname}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      </td>
-
-                      {/* Score */}
-                      <td className="px-4 py-3">
-                        <div className="flex justify-center">
-                          <ScoreBadge score={company.score} size="sm" />
-                        </div>
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-4 py-3">
-                        <StatusBadge status={company.status} />
-                      </td>
-
-                      {/* Contact */}
-                      <td className="px-4 py-3">
-                        {contact ? (
-                          <div className="text-xs">
-                            <div className="text-gray-300">{contact.name}</div>
-                            {contact.title && (
-                              <div className="text-gray-600 truncate max-w-[160px]">
-                                {contact.title}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-600">
-                            Нет контакта
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Activity — emails + recency */}
-                      <td className="px-4 py-3 text-right">
-                        <div className="text-xs">
-                          {company._count.emails > 0 && (
-                            <div className="text-gray-400 tabular-nums">
-                              {company._count.emails} email
-                              {company._count.emails !== 1 ? "s" : ""}
-                            </div>
-                          )}
-                          <div className="text-gray-600 tabular-nums">
-                            {timeAgo(new Date(company.updatedAt))}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
+        {/* Table */}
+        <div className="flex-1 min-w-0">
+          {companies.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon={<Search className="w-10 h-10" />}
+                title="No companies in this folder"
+                description="Move companies here from other stages, or adjust your filters."
+              />
+            </Card>
+          ) : (
+            <Card className="overflow-hidden">
+              <CompaniesTable
+                companies={companies}
+                activeStage={activeStage}
+              />
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

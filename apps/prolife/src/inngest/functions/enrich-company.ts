@@ -196,7 +196,92 @@ export const enrichCompany = inngest.createFunction(
       });
     }
 
-    // Step 7: Waterfall email discovery
+    // Step 7: Apollo People Search — find real decision-makers (FREE)
+    await step.run("apollo-people-search", async () => {
+      const updatedCompany = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { website: true, name: true },
+      });
+      if (!updatedCompany?.website) return;
+
+      const { findPeopleAtCompany, getGravatarUrl } = await import("@agency/scraping");
+      const { extractDomain } = await import("@agency/scraping");
+      const domain = extractDomain(updatedCompany.website);
+      if (!domain) return;
+
+      const apolloPeople = await findPeopleAtCompany(domain, {
+        maxResults: 10,
+      });
+      if (apolloPeople.length === 0) return;
+
+      // Get existing contacts to merge
+      const existing = await prisma.contact.findMany({
+        where: { companyId },
+        select: { id: true, name: true, email: true, linkedin: true },
+      });
+      const existingNames = new Set(
+        existing.map((c) => c.name?.toLowerCase().trim())
+      );
+      const existingLinkedins = new Set(
+        existing.filter((c) => c.linkedin).map((c) => c.linkedin!.toLowerCase())
+      );
+
+      let primarySet = existing.some(
+        (c) => true // check later
+      );
+
+      const priorityTitles =
+        /\b(CEO|Managing Director|General Manager|Sales Director|VP Sales|Head of Sales|Business Development|Commercial Director)\b/i;
+
+      for (const person of apolloPeople) {
+        if (!person.name || person.name.length < 3) continue;
+
+        // Skip if already exists (by name or LinkedIn)
+        const normalizedName = person.name.toLowerCase().trim();
+        if (existingNames.has(normalizedName)) {
+          // Update existing contact with Apollo data if it was <UNKNOWN>
+          const match = existing.find(
+            (c) => c.name?.toLowerCase().trim() === normalizedName
+          );
+          if (match && !match.linkedin && person.linkedinUrl) {
+            await prisma.contact.update({
+              where: { id: match.id },
+              data: {
+                linkedin: person.linkedinUrl,
+                ...(person.photoUrl && { photoUrl: person.photoUrl }),
+                ...(person.title && { title: person.title }),
+                ...(person.seniority && { linkedinSeniority: person.seniority }),
+                ...(person.department && { linkedinDepartment: person.department }),
+              },
+            });
+          }
+          continue;
+        }
+        if (person.linkedinUrl && existingLinkedins.has(person.linkedinUrl.toLowerCase())) {
+          continue;
+        }
+
+        const isPrimary = !primarySet && priorityTitles.test(person.title);
+        if (isPrimary) primarySet = true;
+
+        await prisma.contact.create({
+          data: {
+            companyId,
+            name: person.name,
+            title: person.title || null,
+            linkedin: person.linkedinUrl || null,
+            photoUrl: person.photoUrl || null,
+            linkedinHeadline: person.title || null,
+            linkedinSeniority: person.seniority || null,
+            linkedinDepartment: person.department || null,
+            isPrimary,
+          },
+        });
+        existingNames.add(normalizedName);
+      }
+    });
+
+    // Step 8: Waterfall email discovery (for contacts found by Apollo + website)
     await step.run("waterfall-email-discovery", async () => {
       const contactsWithEmail = await prisma.contact.count({
         where: { companyId, email: { not: null } },
@@ -318,7 +403,7 @@ export const enrichCompany = inngest.createFunction(
       }
     });
 
-    // Step 8: Gravatar photo lookup (free)
+    // Step 9: Gravatar photo lookup (free)
     await step.run("gravatar-photo-lookup", async () => {
       const { getGravatarUrl } = await import("@agency/scraping");
 
@@ -340,7 +425,7 @@ export const enrichCompany = inngest.createFunction(
       }
     });
 
-    // Step 9: Trigger scoring
+    // Step 10: Trigger scoring
     await step.sendEvent("trigger-scoring", {
       name: "prolife/score.calculate",
       data: { tenantId, companyId },

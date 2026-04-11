@@ -30,8 +30,10 @@ import {
   Eye,
   Reply,
   Clock,
+  Phone,
+  Linkedin,
 } from "lucide-react";
-import { RevealContacts } from "./reveal-contacts";
+import { EnrichButton } from "./enrich-button";
 
 export const dynamic = "force-dynamic";
 
@@ -159,6 +161,24 @@ export default async function CompanyDetailPage({
     where: { id: params.id },
     include: {
       _count: { select: { contacts: true } },
+      contacts: {
+        orderBy: [{ isPrimary: "desc" }, { name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          title: true,
+          email: true,
+          phone: true,
+          linkedin: true,
+          photoUrl: true,
+          bio: true,
+          languages: true,
+          isPrimary: true,
+          linkedinHeadline: true,
+          linkedinSeniority: true,
+          linkedinDepartment: true,
+        },
+      },
       emails: {
         orderBy: { createdAt: "desc" },
         include: {
@@ -262,9 +282,14 @@ export default async function CompanyDetailPage({
             <p className="text-sm text-gray-300 leading-relaxed">{aiSummary}</p>
           </div>
 
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            <EnrichButton companyId={company.id} />
+          </div>
+
           {/* Recommended Actions */}
           {nextActions.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4">
+            <div className="flex flex-wrap gap-2 mt-2">
               {nextActions.map((action, i) => {
                 const colors = {
                   high: "border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10",
@@ -290,6 +315,56 @@ export default async function CompanyDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column — company intel */}
         <div className="space-y-5">
+          {/* Portfolio Brands — most important for sales */}
+          {company.portfolioBrands.length > 0 && (
+            <Card>
+              <CardContent>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-white">
+                    Портфель брендов
+                  </h2>
+                  <span className="text-[10px] text-gray-500">
+                    {company.portfolioBrands.length} брендов
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {company.portfolioBrands.map((brand) => {
+                    const brandInfo = (company.portfolioBrandInfo as Record<string, string> | null)?.[brand];
+                    return (
+                      <span
+                        key={brand}
+                        className="text-xs px-2 py-1 rounded-md bg-primary-500/10 text-primary-400 relative group cursor-help"
+                      >
+                        {brand}
+                        {brandInfo && (
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-dark text-gray-200 text-[11px] leading-relaxed border border-white/10 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 max-w-[250px]">
+                            {brandInfo}
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+                {/* Categories */}
+                {company.categories.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-white/5">
+                    <span className="text-gray-500 text-[10px] uppercase tracking-wider">Категории</span>
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {company.categories.map((cat) => (
+                        <span
+                          key={cat}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400"
+                        >
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Score Breakdown */}
           <Card>
             <CardContent>
@@ -381,62 +456,80 @@ export default async function CompanyDetailPage({
                 )}
               </div>
 
-              {/* Categories */}
-              {company.categories.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-white/5">
-                  <span className="text-gray-500 text-[10px] uppercase tracking-wider">Категории</span>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {company.categories.map((cat) => (
-                      <span
-                        key={cat}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400"
-                      >
-                        {cat}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Portfolio Brands */}
-              {company.portfolioBrands.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-white/5">
-                  <span className="text-gray-500 text-[10px] uppercase tracking-wider">
-                    Портфель ({company.portfolioBrands.length} брендов)
-                  </span>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {company.portfolioBrands.map((brand) => {
-                      const brandInfo = (company.portfolioBrandInfo as Record<string, string> | null)?.[brand];
-                      return (
-                        <span
-                          key={brand}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/10 text-primary-400 relative group cursor-help"
-                        >
-                          {brand}
-                          {brandInfo && (
-                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-dark text-gray-200 text-[11px] leading-relaxed border border-white/10 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 max-w-[250px]">
-                              {brandInfo}
-                            </span>
-                          )}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
 
         {/* Right — contacts + emails (2 cols) */}
         <div className="lg:col-span-2 space-y-5">
-          {/* Contacts — behind reveal */}
+          {/* Contacts */}
           <Card>
             <CardContent>
-              <RevealContacts
-                companyId={company.id}
-                contactCount={company._count.contacts}
-              />
+              <h2 className="text-sm font-semibold text-white mb-3">
+                Контакты ({company.contacts.length})
+              </h2>
+              {company.contacts.length === 0 ? (
+                <div className="py-6 text-center">
+                  <Users className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+                  <p className="text-gray-600 text-xs">Контактов пока нет</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {company.contacts.map((contact) => (
+                    <div
+                      key={contact.id}
+                      className="p-3 rounded-lg bg-white/[0.02] border border-white/5"
+                    >
+                      <div className="flex items-start gap-3">
+                        {contact.photoUrl ? (
+                          <img
+                            src={contact.photoUrl}
+                            alt={contact.name}
+                            className="w-9 h-9 rounded-full object-cover border border-white/10 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-dark-tertiary flex items-center justify-center shrink-0 border border-white/10">
+                            <span className="text-[10px] text-gray-500 font-medium">
+                              {contact.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-white truncate">{contact.name}</span>
+                            {contact.isPrimary && (
+                              <span className="text-[9px] px-1 py-0.5 rounded bg-primary-500/20 text-primary-400 shrink-0">PRIMARY</span>
+                            )}
+                          </div>
+                          {contact.title && (
+                            <div className="text-xs text-gray-500 mt-0.5 truncate">{contact.title}</div>
+                          )}
+                          {contact.email && (
+                            <div className="text-xs text-gray-400 mt-1">{contact.email}</div>
+                          )}
+                          <div className="flex items-center gap-3 mt-2">
+                            {contact.email && (
+                              <a href={`mailto:${contact.email}`} className="text-gray-500 hover:text-primary-400 transition-colors" title={contact.email}>
+                                <Mail className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                            {contact.phone && (
+                              <a href={`tel:${contact.phone}`} className="text-gray-500 hover:text-primary-400 transition-colors" title={contact.phone}>
+                                <Phone className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                            {contact.linkedin && (
+                              <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-blue-400 transition-colors">
+                                <Linkedin className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

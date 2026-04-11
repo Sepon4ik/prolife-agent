@@ -68,3 +68,8 @@ export {
   type ApolloPersonResult,
   type ApolloSearchOptions,
 } from "./apollo";
+export {
+  enrichCompanyContacts,
+  type EnrichedContact,
+  type EnrichmentResult,
+} from "./enrichment-waterfall";
