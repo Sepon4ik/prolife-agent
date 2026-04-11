@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProLife Agent — Архитектура</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #08081a; color: #e5e5e5; font-family: 'Inter', system-ui, -apple-system, sans-serif; overflow-x: hidden; }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  h1 { font-size: 1.75rem; font-weight: 700; color: #fff; margin-bottom: 0.25rem; }
+  .subtitle { font-size: 0.75rem; color: #6b7280; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2.5rem; }
+
+  /* Three columns */
+  .arch-grid { display: grid; grid-template-columns: 280px 1fr 280px; gap: 1.5rem; align-items: start; }
+  @media (max-width: 1100px) { .arch-grid { grid-template-columns: 1fr; } }
+
+  /* Column headers */
+  .col-header { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280; margin-bottom: 1rem; text-align: center; }
+
+  /* Service groups */
+  .group { margin-bottom: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); overflow: hidden; }
+  .group-header { padding: 0.6rem 1rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; transition: background 0.2s; }
+  .group-header:hover { background: rgba(255,255,255,0.03); }
+  .group-header .arrow { transition: transform 0.3s; font-size: 0.6rem; color: #6b7280; }
+  .group.collapsed .arrow { transform: rotate(-90deg); }
+  .group.collapsed .group-body { display: none; }
+  .group-body { padding: 0.5rem; }
+
+  /* Color themes */
+  .group-news .group-header { background: rgba(59,130,246,0.08); color: #60a5fa; border-bottom: 1px solid rgba(59,130,246,0.1); }
+  .group-discovery .group-header { background: rgba(34,197,94,0.08); color: #4ade80; border-bottom: 1px solid rgba(34,197,94,0.1); }
+  .group-enrichment .group-header { background: rgba(168,85,247,0.08); color: #c084fc; border-bottom: 1px solid rgba(168,85,247,0.1); }
+  .group-ai .group-header { background: rgba(249,115,22,0.08); color: #fb923c; border-bottom: 1px solid rgba(249,115,22,0.1); }
+  .group-outreach .group-header { background: rgba(6,182,212,0.08); color: #22d3ee; border-bottom: 1px solid rgba(6,182,212,0.1); }
+  .group-notify .group-header { background: rgba(244,63,94,0.08); color: #fb7185; border-bottom: 1px solid rgba(244,63,94,0.1); }
+  .group-infra .group-header { background: rgba(148,163,184,0.08); color: #94a3b8; border-bottom: 1px solid rgba(148,163,184,0.1); }
+
+  /* Service items */
+  .svc { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.6rem; border-radius: 8px; transition: background 0.15s; cursor: default; position: relative; }
+  .svc:hover { background: rgba(255,255,255,0.04); }
+  .svc-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; flex-shrink: 0; }
+  .svc-info { min-width: 0; }
+  .svc-name { font-size: 0.75rem; font-weight: 500; color: #e5e5e5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .svc-detail { font-size: 0.6rem; color: #6b7280; }
+  .svc-badge { font-size: 0.55rem; padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: 500; margin-left: auto; flex-shrink: 0; }
+  .badge-free { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .badge-paid { background: rgba(249,115,22,0.15); color: #fb923c; }
+  .badge-cron { background: rgba(59,130,246,0.15); color: #60a5fa; }
+
+  /* Tooltip */
+  .tooltip { display: none; position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 8px; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem 0.8rem; z-index: 100; width: 220px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+  .svc:hover .tooltip { display: block; }
+  .tooltip-row { font-size: 0.6rem; color: #9ca3af; margin-bottom: 0.2rem; }
+  .tooltip-row span { color: #e5e5e5; }
+
+  /* Center engine */
+  .engine { border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; background: rgba(255,255,255,0.02); padding: 1.5rem; position: relative; }
+  .engine-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280; text-align: center; margin-bottom: 1rem; }
+
+  /* Pipeline stages */
+  .pipeline { display: flex; flex-direction: column; gap: 0.75rem; }
+  .stage { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); position: relative; }
+  .stage-num { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+  .stage-content { flex: 1; }
+  .stage-name { font-size: 0.75rem; font-weight: 600; color: #fff; }
+  .stage-desc { font-size: 0.6rem; color: #6b7280; margin-top: 0.1rem; }
+  .stage-services { display: flex; gap: 0.3rem; margin-top: 0.35rem; flex-wrap: wrap; }
+  .stage-svc { font-size: 0.55rem; padding: 0.15rem 0.4rem; border-radius: 4px; background: rgba(255,255,255,0.05); color: #9ca3af; }
+  .stage-arrow { text-align: center; color: #374151; font-size: 1rem; line-height: 1; }
+
+  /* Colors for stages */
+  .stage-scrape .stage-num { background: rgba(34,197,94,0.2); color: #4ade80; }
+  .stage-enrich .stage-num { background: rgba(168,85,247,0.2); color: #c084fc; }
+  .stage-score .stage-num { background: rgba(249,115,22,0.2); color: #fb923c; }
+  .stage-outreach .stage-num { background: rgba(6,182,212,0.2); color: #22d3ee; }
+  .stage-reply .stage-num { background: rgba(244,63,94,0.2); color: #fb7185; }
+
+  /* Parallel pipelines */
+  .parallel { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid rgba(255,255,255,0.06); }
+  .parallel-label { font-size: 0.6rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+  .parallel-label::before, .parallel-label::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+
+  /* Inngest pulse */
+  .inngest-badge { display: inline-flex; align-items: center; gap: 0.35rem; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.65rem; color: #818cf8; margin-bottom: 1rem; text-align: center; }
+  .pulse-dot { width: 6px; height: 6px; border-radius: 50%; background: #818cf8; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+
+  /* DB badge */
+  .db-section { margin-top: 1.25rem; padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid rgba(148,163,184,0.15); background: rgba(148,163,184,0.05); text-align: center; }
+  .db-title { font-size: 0.7rem; font-weight: 600; color: #94a3b8; }
+  .db-detail { font-size: 0.6rem; color: #6b7280; margin-top: 0.15rem; }
+
+  /* Cron schedule */
+  .cron-section { margin-top: 2rem; }
+  .cron-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: #6b7280; margin-bottom: 0.75rem; }
+  .cron-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  @media (max-width: 600px) { .cron-grid { grid-template-columns: 1fr; } }
+  .cron-item { padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid rgba(59,130,246,0.1); background: rgba(59,130,246,0.03); }
+  .cron-name { font-size: 0.7rem; font-weight: 500; color: #60a5fa; }
+  .cron-time { font-size: 0.6rem; color: #6b7280; }
+  .cron-services { font-size: 0.55rem; color: #4b5563; margin-top: 0.2rem; }
+
+  /* Flow arrows (CSS only) */
+  .flow-arrow { display: flex; align-items: center; justify-content: center; color: #374151; }
+  .flow-arrow::before { content: ''; width: 20px; height: 1px; background: #374151; }
+  .flow-arrow::after { content: '▸'; margin-left: -2px; }
+
+  /* Icon colors */
+  .icon-blue { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .icon-green { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .icon-purple { background: rgba(168,85,247,0.15); color: #c084fc; }
+  .icon-orange { background: rgba(249,115,22,0.15); color: #fb923c; }
+  .icon-cyan { background: rgba(6,182,212,0.15); color: #22d3ee; }
+  .icon-red { background: rgba(244,63,94,0.15); color: #fb7185; }
+  .icon-gray { background: rgba(148,163,184,0.15); color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>ProLife Agent</h1>
+  <p class="subtitle">Архитектура и карта сервисов</p>
+
+  <div class="arch-grid">
+    <!-- LEFT: Data Sources -->
+    <div>
+      <div class="col-header">Источники данных</div>
+
+      <!-- News Intelligence -->
+      <div class="group group-news" onclick="this.classList.toggle('collapsed')">
+        <div class="group-header">
+          Новостная разведка (8 источников)
+          <span class="arrow">▾</span>
+        </div>
+        <div class="group-body">
+          <div class="svc">
+            <div class="svc-icon icon-blue">RSS</div>
+            <div class="svc-info"><div class="svc-name">35 RSS Feeds</div><div class="svc-detail">FiercePharma, MedTech Dive, FDA...</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-blue">G</div>
+            <div class="svc-info"><div class="svc-name">Google News RSS</div><div class="svc-detail">Topic + company name queries</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-blue">GN</div>
+            <div class="svc-info"><div class="svc-name">GNews API</div><div class="svc-detail">GNEWS_API_KEY</div></div>
+            <span class="svc-badge badge-free">100/day</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-blue">FDA</div>
+            <div class="svc-info"><div class="svc-name">OpenFDA</div><div class="svc-detail">Approvals, recalls, shortages</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-blue">CT</div>
+            <div class="svc-info"><div class="svc-name">ClinicalTrials.gov</div><div class="svc-detail">NIH trial registry</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-blue">EMA</div>
+            <div class="svc-info"><div class="svc-name">EMA Medicines</div><div class="svc-detail">European approvals</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-blue">PX</div>
+            <div class="svc-info"><div class="svc-name">Pexels</div><div class="svc-detail">Stock photos for news</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-blue">WM</div>
+            <div class="svc-info"><div class="svc-name">Company Websites</div><div class="svc-detail">Change detection (top 50)</div></div>
+            <span class="svc-badge badge-cron">daily</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Company Discovery -->
+      <div class="group group-discovery" onclick="this.classList.toggle('collapsed')">
+        <div class="group-header">
+          Поиск компаний (6 источников)
+          <span class="arrow">▾</span>
+        </div>
+        <div class="group-body">
+          <div class="svc">
+            <div class="svc-icon icon-green">G</div>
+            <div class="svc-info"><div class="svc-name">Google Search</div><div class="svc-detail">SERPAPI_KEY</div></div>
+            <span class="svc-badge badge-paid">paid</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-green">GM</div>
+            <div class="svc-info"><div class="svc-name">Google Maps</div><div class="svc-detail">GOOGLE_PLACES_API_KEY</div></div>
+            <span class="svc-badge badge-paid">paid</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-green">EX</div>
+            <div class="svc-info"><div class="svc-name">Exhibition Sites</div><div class="svc-detail">13 pharma exhibitions</div></div>
+            <span class="svc-badge badge-free">scrape</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-green">OC</div>
+            <div class="svc-info"><div class="svc-name">OpenCorporates</div><div class="svc-detail">Trade registries</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-green">CT</div>
+            <div class="svc-info"><div class="svc-name">UN Comtrade</div><div class="svc-detail">Pharma trade flows</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-green">WB</div>
+            <div class="svc-info"><div class="svc-name">Company Websites</div><div class="svc-detail">Direct crawling</div></div>
+            <span class="svc-badge badge-free">scrape</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contact Enrichment -->
+      <div class="group group-enrichment" onclick="this.classList.toggle('collapsed')">
+        <div class="group-header">
+          Обогащение контактов (4 источника)
+          <span class="arrow">▾</span>
+        </div>
+        <div class="group-body">
+          <div class="svc">
+            <div class="svc-icon icon-purple">AP</div>
+            <div class="svc-info"><div class="svc-name">Apollo.io</div><div class="svc-detail">Free search, paid reveal</div></div>
+            <span class="svc-badge badge-free">free search</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-purple">HU</div>
+            <div class="svc-info"><div class="svc-name">Hunter.io</div><div class="svc-detail">HUNTER_API_KEY</div></div>
+            <span class="svc-badge badge-paid">$0.10/cr</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-purple">GR</div>
+            <div class="svc-info"><div class="svc-name">Gravatar</div><div class="svc-detail">Contact photos</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-purple">UP</div>
+            <div class="svc-info"><div class="svc-name">Unipile (LinkedIn)</div><div class="svc-detail">Profile data enrichment</div></div>
+            <span class="svc-badge badge-paid">paid</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: Engine -->
+    <div>
+      <div class="col-header">Движок ProLife</div>
+      <div class="engine">
+        <div style="text-align:center; margin-bottom: 1rem;">
+          <div class="inngest-badge"><span class="pulse-dot"></span> Inngest Очередь — 12 функций</div>
+        </div>
+
+        <!-- Main Pipeline -->
+        <div class="engine-title">Пайплайн лидов</div>
+        <div class="pipeline">
+          <div class="stage stage-scrape">
+            <div class="stage-num">1</div>
+            <div class="stage-content">
+              <div class="stage-name">Скрейпинг и поиск</div>
+              <div class="stage-desc">Находим компании из 10+ источников</div>
+              <div class="stage-services">
+                <span class="stage-svc">scrape-pipeline</span>
+                <span class="stage-svc">Company → RAW</span>
+              </div>
+            </div>
+          </div>
+          <div class="stage-arrow">↓</div>
+          <div class="stage stage-enrich">
+            <div class="stage-num">2</div>
+            <div class="stage-content">
+              <div class="stage-name">AI Обогащение</div>
+              <div class="stage-desc">Классификация, поиск контактов, email discovery</div>
+              <div class="stage-services">
+                <span class="stage-svc">Claude Haiku</span>
+                <span class="stage-svc">Apollo</span>
+                <span class="stage-svc">Hunter</span>
+                <span class="stage-svc">→ ENRICHED</span>
+              </div>
+            </div>
+          </div>
+          <div class="stage-arrow">↓</div>
+          <div class="stage stage-score">
+            <div class="stage-num">3</div>
+            <div class="stage-content">
+              <div class="stage-name">Скоринг (11 факторов)</div>
+              <div class="stage-desc">Гео, тип, выручка, intent-сигналы, портфель...</div>
+              <div class="stage-services">
+                <span class="stage-svc">score-company</span>
+                <span class="stage-svc">A/B/C priority</span>
+                <span class="stage-svc">→ SCORED</span>
+              </div>
+            </div>
+          </div>
+          <div class="stage-arrow">↓</div>
+          <div class="stage stage-outreach">
+            <div class="stage-num">4</div>
+            <div class="stage-content">
+              <div class="stage-name">Рассылка</div>
+              <div class="stage-desc">AI генерация писем + LinkedIn последовательность</div>
+              <div class="stage-services">
+                <span class="stage-svc">Claude Sonnet</span>
+                <span class="stage-svc">Resend</span>
+                <span class="stage-svc">Unipile</span>
+                <span class="stage-svc">→ OUTREACH_SENT</span>
+              </div>
+            </div>
+          </div>
+          <div class="stage-arrow">↓</div>
+          <div class="stage stage-reply">
+            <div class="stage-num">5</div>
+            <div class="stage-content">
+              <div class="stage-name">Ответ → Передача в продажи</div>
+              <div class="stage-desc">Классификация ответа, уведомление команды</div>
+              <div class="stage-services">
+                <span class="stage-svc">Claude Haiku</span>
+                <span class="stage-svc">Telegram</span>
+                <span class="stage-svc">Slack</span>
+                <span class="stage-svc">→ HANDED_OFF</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parallel: News -->
+        <div class="parallel">
+          <div class="parallel-label">Новостной пайплайн</div>
+          <div class="pipeline">
+            <div class="stage" style="border-color: rgba(59,130,246,0.15);">
+              <div class="stage-num icon-blue">N</div>
+              <div class="stage-content">
+                <div class="stage-name">Сбор → Резюме → Перевод → Привязка</div>
+                <div class="stage-desc">35 RSS + API → AI резюме → привязка к компаниям → картинки</div>
+                <div class="stage-services">
+                  <span class="stage-svc">news-collect</span>
+                  <span class="stage-svc">news-backfill</span>
+                  <span class="stage-svc">Claude Haiku</span>
+                  <span class="stage-svc">Pexels</span>
+                </div>
+              </div>
+              <span class="svc-badge badge-cron">6h</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parallel: Website Monitor -->
+        <div class="parallel">
+          <div class="parallel-label">Мониторинг сайтов</div>
+          <div class="pipeline">
+            <div class="stage" style="border-color: rgba(34,197,94,0.15);">
+              <div class="stage-num icon-green">W</div>
+              <div class="stage-content">
+                <div class="stage-name">Скрейпинг топ-50 → Сравнение → Алерт</div>
+                <div class="stage-desc">SHA-256 детекция изменений на сайтах компаний</div>
+                <div class="stage-services">
+                  <span class="stage-svc">website-monitor</span>
+                  <span class="stage-svc">/news, /products, /partners</span>
+                </div>
+              </div>
+              <span class="svc-badge badge-cron">daily</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DB -->
+        <div class="db-section" style="text-align:left; cursor:pointer;" onclick="document.getElementById('db-models').style.display = document.getElementById('db-models').style.display === 'none' ? 'block' : 'none'">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div class="db-title" style="text-align:left;">Neon Postgres — 19 моделей</div>
+              <div class="db-detail" style="text-align:left;">Prisma ORM + better-auth (прямое подключение). Нажми чтобы раскрыть.</div>
+            </div>
+            <span style="color:#6b7280; font-size:0.7rem;">▾</span>
+          </div>
+          <div id="db-models" style="display:none; margin-top:0.75rem; font-size:0.6rem; line-height:1.8;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.25rem 1rem;">
+              <div><span style="color:#4ade80;">●</span> <b style="color:#e5e5e5;">Tenant</b> <span style="color:#4b5563;">— мультитенант, kill switch</span></div>
+              <div><span style="color:#4ade80;">●</span> <b style="color:#e5e5e5;">ProlifeUser</b> <span style="color:#4b5563;">— роли, привязка к tenant</span></div>
+              <div><span style="color:#60a5fa;">●</span> <b style="color:#e5e5e5;">Company</b> <span style="color:#4b5563;">— 20+ полей, скоринг, статус</span></div>
+              <div><span style="color:#60a5fa;">●</span> <b style="color:#e5e5e5;">Contact</b> <span style="color:#4b5563;">— email, phone, LinkedIn</span></div>
+              <div><span style="color:#22d3ee;">●</span> <b style="color:#e5e5e5;">Email</b> <span style="color:#4b5563;">— outreach tracking</span></div>
+              <div><span style="color:#22d3ee;">●</span> <b style="color:#e5e5e5;">Mailbox</b> <span style="color:#4b5563;">— ротация, DNS health</span></div>
+              <div><span style="color:#c084fc;">●</span> <b style="color:#e5e5e5;">LinkedInAccount</b> <span style="color:#4b5563;">— Unipile аккаунты</span></div>
+              <div><span style="color:#c084fc;">●</span> <b style="color:#e5e5e5;">LinkedInAction</b> <span style="color:#4b5563;">— views, connects, msgs</span></div>
+              <div><span style="color:#60a5fa;">●</span> <b style="color:#e5e5e5;">NewsItem</b> <span style="color:#4b5563;">— 28 полей, перевод, score</span></div>
+              <div><span style="color:#60a5fa;">●</span> <b style="color:#e5e5e5;">Topic</b> <span style="color:#4b5563;">— ключевые слова, страны</span></div>
+              <div><span style="color:#60a5fa;">●</span> <b style="color:#e5e5e5;">Alert</b> <span style="color:#4b5563;">— уведомления по порогу</span></div>
+              <div><span style="color:#4ade80;">●</span> <b style="color:#e5e5e5;">ScrapingJob</b> <span style="color:#4b5563;">— статус, найдено/новых</span></div>
+              <div><span style="color:#94a3b8;">●</span> <b style="color:#e5e5e5;">WebhookEvent</b> <span style="color:#4b5563;">— входящие вебхуки</span></div>
+              <div><span style="color:#fb7185;">●</span> <b style="color:#e5e5e5;">RevealLog</b> <span style="color:#4b5563;">— аудит просмотров</span></div>
+              <div><span style="color:#60a5fa;">●</span> <b style="color:#e5e5e5;">FeedHealthLog</b> <span style="color:#4b5563;">— здоровье RSS</span></div>
+              <div><span style="color:#4ade80;">●</span> <b style="color:#e5e5e5;">CompanyPageSnapshot</b> <span style="color:#4b5563;">— мониторинг сайтов</span></div>
+            </div>
+            <div style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid rgba(255,255,255,0.06); color:#4b5563;">
+              + 3 таблицы better-auth: <span style="color:#6b7280;">user, session, account</span> (вне Prisma)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Outputs -->
+    <div>
+      <div class="col-header">Каналы вывода</div>
+
+      <div class="group group-outreach" onclick="this.classList.toggle('collapsed')">
+        <div class="group-header">
+          Каналы рассылки
+          <span class="arrow">▾</span>
+        </div>
+        <div class="group-body">
+          <div class="svc">
+            <div class="svc-icon icon-cyan">RE</div>
+            <div class="svc-info"><div class="svc-name">Resend (Email)</div><div class="svc-detail">Multi-mailbox, plain-text</div></div>
+            <span class="svc-badge badge-paid">paid</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-cyan">LI</div>
+            <div class="svc-info"><div class="svc-name">LinkedIn (Unipile)</div><div class="svc-detail">15 conn/day, 25 msg/day</div></div>
+            <span class="svc-badge badge-paid">paid</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="group group-notify" onclick="this.classList.toggle('collapsed')">
+        <div class="group-header">
+          Уведомления
+          <span class="arrow">▾</span>
+        </div>
+        <div class="group-body">
+          <div class="svc">
+            <div class="svc-icon icon-red">TG</div>
+            <div class="svc-info"><div class="svc-name">Telegram Bot</div><div class="svc-detail">Alerts, sales handoff</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-red">SL</div>
+            <div class="svc-info"><div class="svc-name">Slack Webhook</div><div class="svc-detail">Team notifications</div></div>
+            <span class="svc-badge badge-free">free</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="group group-infra" onclick="this.classList.toggle('collapsed')">
+        <div class="group-header">
+          Инфраструктура
+          <span class="arrow">▾</span>
+        </div>
+        <div class="group-body">
+          <div class="svc">
+            <div class="svc-icon icon-gray">VE</div>
+            <div class="svc-info"><div class="svc-name">Vercel</div><div class="svc-detail">Next.js 14 deploy</div></div>
+            <span class="svc-badge badge-paid">paid</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-gray">IN</div>
+            <div class="svc-info"><div class="svc-name">Inngest</div><div class="svc-detail">12 background functions</div></div>
+            <span class="svc-badge badge-paid">paid</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-gray">NE</div>
+            <div class="svc-info"><div class="svc-name">Neon Postgres</div><div class="svc-detail">DATABASE_URL</div></div>
+            <span class="svc-badge badge-paid">paid</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-gray">BA</div>
+            <div class="svc-info"><div class="svc-name">better-auth</div><div class="svc-detail">Email + password</div></div>
+            <span class="svc-badge badge-free">OSS</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="group group-ai" onclick="this.classList.toggle('collapsed')">
+        <div class="group-header">
+          AI Обработка
+          <span class="arrow">▾</span>
+        </div>
+        <div class="group-body">
+          <div class="svc">
+            <div class="svc-icon icon-orange">H</div>
+            <div class="svc-info"><div class="svc-name">Claude Haiku 4.5</div><div class="svc-detail">Classify, summarize, translate</div></div>
+            <span class="svc-badge badge-paid">$0.80/M</span>
+          </div>
+          <div class="svc">
+            <div class="svc-icon icon-orange">S</div>
+            <div class="svc-info"><div class="svc-name">Claude Sonnet 4</div><div class="svc-detail">Email generation</div></div>
+            <span class="svc-badge badge-paid">$3/M</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard preview -->
+      <div class="group group-infra">
+        <div class="group-header" style="background: rgba(124,92,252,0.08); color: #a78bfa; border-bottom: 1px solid rgba(124,92,252,0.1);">
+          Дашборд (Next.js)
+          <span class="arrow">▾</span>
+        </div>
+        <div class="group-body">
+          <div class="svc"><div class="svc-icon" style="background:rgba(124,92,252,0.15);color:#a78bfa;">📊</div><div class="svc-info"><div class="svc-name">Центр управления</div><div class="svc-detail">KPI, воронка, активность</div></div></div>
+          <div class="svc"><div class="svc-icon" style="background:rgba(124,92,252,0.15);color:#a78bfa;">🏢</div><div class="svc-info"><div class="svc-name">Пайплайн</div><div class="svc-detail">43 компании, reveal contacts</div></div></div>
+          <div class="svc"><div class="svc-icon" style="background:rgba(124,92,252,0.15);color:#a78bfa;">📰</div><div class="svc-info"><div class="svc-name">Аналитика (News)</div><div class="svc-detail">300+ статей, AI перевод</div></div></div>
+          <div class="svc"><div class="svc-icon" style="background:rgba(124,92,252,0.15);color:#a78bfa;">✉️</div><div class="svc-info"><div class="svc-name">Рассылка</div><div class="svc-detail">68 писем, multi-mailbox</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cron Schedule -->
+  <div class="cron-section">
+    <div class="cron-title">Расписание автоматизации (Inngest кроны)</div>
+    <div class="cron-grid">
+      <div class="cron-item">
+        <div class="cron-name">news-collect</div>
+        <div class="cron-time">Каждые 6 часов — 00:00, 06:00, 12:00, 18:00</div>
+        <div class="cron-services">35 RSS + Google News + GNews + FDA + EMA + ClinicalTrials + Картинки</div>
+      </div>
+      <div class="cron-item">
+        <div class="cron-name">news-backfill</div>
+        <div class="cron-time">+1ч после collect — 01:00, 07:00, 13:00, 19:00</div>
+        <div class="cron-services">Извлечение контента + перевод на русский (Claude Haiku) + картинки</div>
+      </div>
+      <div class="cron-item">
+        <div class="cron-name">website-monitor</div>
+        <div class="cron-time">Ежедневно — 05:00 UTC</div>
+        <div class="cron-services">Top 50 companies: /news, /products, /partners, /careers + homepage</div>
+      </div>
+      <div class="cron-item">
+        <div class="cron-name">intel-pipeline</div>
+        <div class="cron-time">Каждые 6 часов</div>
+        <div class="cron-services">Полная обработка: Google News запросы + AI резюмирование</div>
+      </div>
+    </div>
+  </div>
+
+  <p style="text-align:center; font-size:0.6rem; color:#374151; margin-top:2rem;">ProLife Agent v1.0 — 21 внешний сервис, 19 моделей БД, 12 Inngest функций — Собрано 11.04.2026</p>
+</div>
+</body>
+</html>
