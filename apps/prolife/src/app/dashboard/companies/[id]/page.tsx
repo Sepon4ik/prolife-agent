@@ -33,6 +33,7 @@ import {
   Phone,
   Linkedin,
 } from "lucide-react";
+import { EnrichButton } from "./enrich-button";
 
 export const dynamic = "force-dynamic";
 
@@ -281,9 +282,14 @@ export default async function CompanyDetailPage({
             <p className="text-sm text-gray-300 leading-relaxed">{aiSummary}</p>
           </div>
 
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            <EnrichButton companyId={company.id} />
+          </div>
+
           {/* Recommended Actions */}
           {nextActions.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4">
+            <div className="flex flex-wrap gap-2 mt-2">
               {nextActions.map((action, i) => {
                 const colors = {
                   high: "border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/10",
