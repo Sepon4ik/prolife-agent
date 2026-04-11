@@ -75,6 +75,20 @@ enum GeoPriority {
   P3
 }
 
+enum PipelineStage {
+  NEW
+  DEEP_RESEARCH
+  LAST_STAGE
+  TRASH
+}
+
+enum SalesStatus {
+  READY_TO_WORK
+  IN_PROGRESS
+  POTENTIAL_CONTRACT
+  DONE
+}
+
 // ── Models ──
 
 model Tenant {
@@ -131,6 +145,12 @@ model Company {
   status      CompanyStatus @default(RAW)
   geoPriority GeoPriority?
 
+  // Sales pipeline (manual, managed by client)
+  stage        PipelineStage @default(NEW)
+  salesStatus  SalesStatus?  // only for LAST_STAGE
+  trashReason  String?       // only for TRASH
+  stageMovedAt DateTime      @default(now())
+
   // AI enrichment fields
   categories        String[]  @default([])
   estimatedRevenue   String?   // under_2m, 2m_10m, 10m_plus, unknown
@@ -164,6 +184,7 @@ model Company {
   @@index([tenantId, country, priority])
   @@index([tenantId, type])
   @@index([tenantId, geoPriority])
+  @@index([tenantId, stage, country])
   @@unique([tenantId, name, country])
 }
 
