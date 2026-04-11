@@ -57,7 +57,23 @@ export const newsCollect = inngest.createFunction(
       }
     }
 
-    const uniqueQueries = [...new Set(allQueries)].slice(0, 30);
+    // Step 2b: Add company-name queries for top scored companies (mentions monitoring)
+    const companyQueries = await step.run("build-company-queries", async () => {
+      const topCompanies = await prisma.company.findMany({
+        where: {
+          tenantId: tenant.id,
+          status: { in: ["SCORED", "OUTREACH_SENT", "REPLIED", "INTERESTED"] },
+          deletedAt: null,
+        },
+        select: { name: true },
+        orderBy: { score: "desc" },
+        take: 20,
+      });
+      return topCompanies.map((c) => `"${c.name}"`); // Exact match in Google News
+    });
+
+    allQueries.push(...companyQueries);
+    const uniqueQueries = [...new Set(allQueries)].slice(0, 50); // Increased from 30
 
     // Step 3: Aggregate news from all sources
     const aggregateResult = await step.run("aggregate-news", async () => {

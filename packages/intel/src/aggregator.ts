@@ -286,6 +286,14 @@ export function getPharmaRSSFeeds(): Array<{ url: string; name: string; category
     { url: "https://www.massdevice.com/feed/", name: "MassDevice", category: "medtech" },
     { url: "https://www.mddionline.com/rss", name: "MD+DI Online", category: "medtech" },
     { url: "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/medical-devices/rss.xml", name: "FDA Medical Devices", category: "medtech" },
+    { url: "https://www.fiercemedtech.com/rss/xml", name: "Fierce MedTech", category: "medtech" },
+    { url: "https://www.medicaldesignandoutsourcing.com/feed/", name: "Medical Design & Outsourcing", category: "medtech" },
+    { url: "https://www.medgadget.com/feed", name: "Medgadget", category: "medtech" },
+    { url: "https://www.healthcareitnews.com/feed", name: "Healthcare IT News", category: "medtech" },
+    { url: "https://www.mobihealthnews.com/feed", name: "MobiHealthNews", category: "medtech" },
+
+    // ── Emerging Markets Pharma ──
+    { url: "https://www.pharmaboardroom.com/feed/", name: "PharmaBoardroom EM", category: "emerging" },
   ];
 }
 

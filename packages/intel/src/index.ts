@@ -37,6 +37,13 @@ export {
   type TranslationResult,
 } from "./content-extractor";
 
+export {
+  discoverCompanyPages,
+  scrapePage,
+  getContentDiff,
+  type PageScrapeResult,
+} from "./website-monitor";
+
 // New data sources
 export {
   fetchAllFDA,

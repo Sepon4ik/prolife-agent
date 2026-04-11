@@ -148,10 +148,11 @@ model Company {
   sourceUrl  String?
   sourceExhibition String?
 
-  contacts   Contact[]
-  emails     Email[]
-  newsItems  NewsItem[]
-  revealLogs RevealLog[]
+  contacts      Contact[]
+  emails        Email[]
+  newsItems     NewsItem[]
+  revealLogs    RevealLog[]
+  pageSnapshots CompanyPageSnapshot[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -464,6 +465,27 @@ model RevealLog {
 
   @@index([tenantId, userId, createdAt])
   @@index([companyId])
+}
+
+// ── Intel: Company Website Monitoring ──
+
+model CompanyPageSnapshot {
+  id          String   @id @default(cuid())
+  companyId   String
+  pageUrl     String
+  pageType    String   // news, products, partners, careers, homepage
+  contentHash String   // SHA-256 of extracted text — detect changes
+  content     String?  // Extracted text content (latest)
+  previousContent String? // Previous version for diff
+  changeDetected Boolean @default(false)
+  changeSummary  String? // AI-generated summary of what changed
+  checkedAt   DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, pageUrl])
+  @@index([companyId, checkedAt])
+  @@index([changeDetected, checkedAt])
 }
 
 // ── Intel: Feed Health Monitoring ──

@@ -10,6 +10,7 @@ import { salesHandoff } from "@/inngest/functions/sales-handoff";
 import { newsCollect } from "@/inngest/functions/news-collect";
 import { newsBackfillContent } from "@/inngest/functions/news-backfill";
 import { newsEnrichCompanies } from "@/inngest/functions/news-enrich-companies";
+import { websiteMonitor } from "@/inngest/functions/website-monitor";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -24,5 +25,6 @@ export const { GET, POST, PUT } = serve({
     newsCollect,
     newsBackfillContent,
     newsEnrichCompanies,
+    websiteMonitor,
   ],
 });
