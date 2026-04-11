@@ -5,6 +5,8 @@ import {
   summarizeNewsItems,
   matchEntitiesToCompanies,
   topicToQueries,
+  extractImageOnly,
+  findStockImage,
 } from "@agency/intel";
 
 /**
@@ -164,6 +166,29 @@ export async function POST() {
       }
     }
 
+    // 7. Extract images for items missing them (inline, so they appear with images)
+    const itemsWithoutImages = await prisma.newsItem.findMany({
+      where: { imageUrl: null, tenantId: tenant.id },
+      select: { id: true, url: true, title: true, category: true },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    let imagesExtracted = 0;
+    for (const item of itemsWithoutImages) {
+      let imageUrl = await extractImageOnly(item.url);
+      if (!imageUrl) {
+        imageUrl = await findStockImage(item.title, item.category);
+      }
+      if (imageUrl) {
+        await prisma.newsItem.update({
+          where: { id: item.id },
+          data: { imageUrl },
+        });
+        imagesExtracted++;
+      }
+    }
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -174,6 +199,7 @@ export async function POST() {
         matched: matched.filter((m) => m.companyId).length,
         saved,
         skipped,
+        imagesExtracted,
       },
       sources: {
         rss: rawItems.filter((i) => !["FDA Approvals", "FDA Recalls", "FDA Shortages", "ClinicalTrials.gov", "EMA"].includes(i.source)).length,

@@ -5,6 +5,8 @@ import {
   summarizeNewsItems,
   matchEntitiesToCompanies,
   topicToQueries,
+  extractImageOnly,
+  findStockImage,
 } from "@agency/intel";
 
 /**
@@ -157,7 +159,47 @@ export const newsCollect = inngest.createFunction(
       return { saved, skipped, newItemIds };
     });
 
-    // Step 7: Trigger content backfill for new items
+    // Step 7: Extract images for new items immediately (so they appear with images in UI)
+    let imagesExtracted = 0;
+    if (saveResult.newItemIds.length > 0) {
+      const itemsWithoutImages = await step.run("find-imageless", async () => {
+        return prisma.newsItem.findMany({
+          where: {
+            id: { in: saveResult.newItemIds },
+            imageUrl: null,
+          },
+          select: { id: true, url: true, title: true, category: true },
+          take: 50,
+        });
+      });
+
+      // Process in batches of 10
+      for (let i = 0; i < itemsWithoutImages.length; i += 10) {
+        const batch = itemsWithoutImages.slice(i, i + 10);
+        const batchIndex = Math.floor(i / 10);
+
+        const batchResult = await step.run(`extract-images-${batchIndex}`, async () => {
+          let count = 0;
+          for (const item of batch) {
+            let imageUrl = await extractImageOnly(item.url);
+            if (!imageUrl) {
+              imageUrl = await findStockImage(item.title, item.category);
+            }
+            if (imageUrl) {
+              await prisma.newsItem.update({
+                where: { id: item.id },
+                data: { imageUrl },
+              });
+              count++;
+            }
+          }
+          return count;
+        });
+        imagesExtracted += batchResult;
+      }
+    }
+
+    // Step 8: Trigger content backfill (translate + full content)
     if (saveResult.newItemIds.length > 0) {
       await step.sendEvent("trigger-backfill", {
         name: "prolife/news.backfill-content",
@@ -187,6 +229,7 @@ export const newsCollect = inngest.createFunction(
         saved: saveResult.saved,
         skipped: saveResult.skipped,
         newItems: saveResult.newItemIds.length,
+        imagesExtracted,
       },
     };
   }
