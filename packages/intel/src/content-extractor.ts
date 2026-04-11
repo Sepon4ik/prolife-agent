@@ -204,33 +204,87 @@ export async function extractArticleContent(
 
 /**
  * Resolve Google News redirect URLs to actual article URLs.
- * Google News encodes URLs in protobuf within the base64 article ID.
- * The URL is embedded as a string field in the protobuf message.
+ *
+ * Google changed from base64-encoded protobuf (which contained URLs directly)
+ * to encrypted article IDs (CBMi... format). The old base64 decoder no longer works.
+ *
+ * New strategy:
+ * 1. Convert RSS URL to web article URL and follow HTTP redirects
+ * 2. Parse response HTML for the actual article URL (data attributes, meta refresh)
+ * 3. Fall back to base64 decode for older-format articles that still work
  */
 async function resolveGoogleNewsUrl(url: string): Promise<string> {
-  if (!url.includes("news.google.com/rss/articles/")) return url;
-
-  try {
-    // Extract the base64-encoded article ID from the URL
-    const match = url.match(/articles\/([^?]+)/);
-    if (!match) return url;
-
-    // Decode base64 (URL-safe variant)
-    const encoded = match[1].replace(/-/g, "+").replace(/_/g, "/");
-    const decoded = Buffer.from(encoded, "base64");
-
-    // Extract URLs from the protobuf binary data
-    // URLs appear as plain ASCII strings starting with "http"
-    const str = decoded.toString("binary");
-    const urlMatch = str.match(/https?:\/\/[^\s\x00-\x1f"<>]+/);
-    if (urlMatch) {
-      return urlMatch[0];
-    }
-
-    return url;
-  } catch {
+  if (!url.includes("news.google.com/rss/articles/") && !url.includes("news.google.com/articles/")) {
     return url;
   }
+
+  // Strategy 1: HTTP redirect follow
+  try {
+    // Convert /rss/articles/ to /articles/ for web access
+    const webUrl = url.replace("/rss/articles/", "/articles/");
+
+    const res = await fetch(webUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9",
+        Cookie: "CONSENT=PENDING+987; NID=1234",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    const finalUrl = res.url;
+    // If redirected to an external site, that's our article
+    if (finalUrl && !finalUrl.includes("google.com") && !finalUrl.includes("consent.")) {
+      return finalUrl;
+    }
+
+    // Strategy 2: Parse HTML response for the real URL
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("text/html")) {
+      const html = await res.text();
+
+      // Google embeds the real URL in data-n-au, jsdata, or as a redirect target
+      const patterns = [
+        /data-n-au="([^"]+)"/,
+        /href="(https?:\/\/(?!(?:news|accounts|consent|www)\.google\.com)[^"]+)"[^>]*data-n/,
+        /window\.location\s*=\s*["'](https?:\/\/(?!google\.com)[^"']+)["']/,
+        /<a[^>]+href="(https?:\/\/(?!(?:news|accounts|consent)\.google\.com)[^"]+)"[^>]*class="[^"]*article/i,
+        /rel="canonical"\s+href="(https?:\/\/(?!google\.com)[^"]+)"/,
+      ];
+
+      for (const pattern of patterns) {
+        const match = html.match(pattern);
+        if (match?.[1]) {
+          try {
+            return decodeURIComponent(match[1]);
+          } catch {
+            return match[1];
+          }
+        }
+      }
+    }
+  } catch {
+    // HTTP approach failed, try base64 fallback
+  }
+
+  // Strategy 3: Legacy base64 decode (works for some older articles)
+  try {
+    const match = url.match(/articles\/([^?]+)/);
+    if (match) {
+      const encoded = match[1].replace(/-/g, "+").replace(/_/g, "/");
+      const decoded = Buffer.from(encoded, "base64");
+      const str = decoded.toString("binary");
+      const urlMatch = str.match(/https?:\/\/[^\s\x00-\x1f"<>]+/);
+      if (urlMatch) return urlMatch[0];
+    }
+  } catch {
+    // Both strategies failed
+  }
+
+  return url;
 }
 
 /** Resolve relative URLs to absolute */

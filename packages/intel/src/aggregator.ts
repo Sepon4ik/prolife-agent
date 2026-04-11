@@ -23,6 +23,10 @@ export interface RawNewsItem {
   source: string;
   snippet: string;
   publishedAt?: string;
+  /** Direct image URL extracted from RSS (enclosure, media:content, og:image) */
+  imageUrl?: string;
+  /** Publisher's base URL from Google News <source url=""> attribute */
+  sourceUrl?: string;
 }
 
 // ── Google News RSS (free, no key) ──
@@ -59,6 +63,7 @@ export async function fetchGoogleNewsRSS(
         const title = $(item).find("title").text().trim();
         const url = $(item).find("link").text().trim();
         const source = $(item).find("source").text().trim();
+        const sourceUrl = $(item).find("source").attr("url") ?? undefined;
         const pubDate = $(item).find("pubDate").text().trim();
         const desc = $(item).find("description").text().trim();
         const snippet = cheerio.load(desc).text().replace(/\s+/g, " ").trim().slice(0, 500);
@@ -70,6 +75,7 @@ export async function fetchGoogleNewsRSS(
             source: source || "Google News",
             snippet,
             publishedAt: pubDate || undefined,
+            sourceUrl,
           });
         }
       });
@@ -175,8 +181,18 @@ export async function fetchRSSFeed(
         const pubDate = $(item).find("pubDate").text().trim();
         const snippet = cheerio.load(desc).text().replace(/\s+/g, " ").trim().slice(0, 500);
 
+        // Extract image from RSS media tags
+        const imageUrl = extractRSSImage($(item));
+
         if (title && url) {
-          items.push({ title, url, source: sourceName, snippet, publishedAt: pubDate || undefined });
+          items.push({
+            title,
+            url,
+            source: sourceName,
+            snippet,
+            publishedAt: pubDate || undefined,
+            imageUrl,
+          });
         }
       });
 
@@ -190,6 +206,8 @@ export async function fetchRSSFeed(
           const summary = $(entry).find("summary").text().trim();
           const published = $(entry).find("published").text().trim();
 
+          const imageUrl = extractRSSImage($(entry));
+
           if (title && url) {
             items.push({
               title,
@@ -197,6 +215,7 @@ export async function fetchRSSFeed(
               source: sourceName,
               snippet: summary.slice(0, 500),
               publishedAt: published || undefined,
+              imageUrl,
             });
           }
         });
@@ -332,6 +351,43 @@ export async function aggregateNews(
   }
 
   return all;
+}
+
+/**
+ * Extract image URL from RSS item using standard media tags.
+ * Checks (in priority order): media:content, media:thumbnail, enclosure, img in description.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractRSSImage(el: cheerio.Cheerio<any>): string | undefined {
+  // 1. media:content with image type or medium="image"
+  const mediaContent =
+    el.find("media\\:content[medium='image']").attr("url") ??
+    el.find("media\\:content[type^='image']").attr("url") ??
+    el.find("media\\:content").attr("url");
+  if (mediaContent) return mediaContent;
+
+  // 2. media:thumbnail
+  const mediaThumbnail = el.find("media\\:thumbnail").attr("url");
+  if (mediaThumbnail) return mediaThumbnail;
+
+  // 3. enclosure with image type
+  const enclosure = el.find("enclosure[type^='image']").attr("url");
+  if (enclosure) return enclosure;
+
+  // 4. Any enclosure (some feeds don't set type)
+  const anyEnclosure = el.find("enclosure").attr("url");
+  if (anyEnclosure && /\.(jpg|jpeg|png|webp|gif)/i.test(anyEnclosure)) {
+    return anyEnclosure;
+  }
+
+  // 5. img tag inside description HTML (common in RSS)
+  const desc = el.find("description").html() ?? el.find("content\\:encoded").html() ?? "";
+  const imgMatch = desc.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if (imgMatch?.[1] && !imgMatch[1].startsWith("data:")) {
+    return imgMatch[1];
+  }
+
+  return undefined;
 }
 
 function delay(ms: number): Promise<void> {

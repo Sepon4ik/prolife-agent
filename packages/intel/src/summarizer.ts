@@ -23,6 +23,10 @@ export interface ProcessedNewsItem {
   countries: string[];
   sentiment: "positive" | "negative" | "neutral";
   relevanceScore: number;
+  /** Image URL extracted from RSS feed (enclosure, media:content, etc.) */
+  imageUrl?: string;
+  /** Publisher URL from Google News <source url=""> */
+  sourceUrl?: string;
 }
 
 // ── AI Processing ──
@@ -40,7 +44,12 @@ export async function summarizeNewsItems(
   if (!apiKey) {
     console.warn("ANTHROPIC_API_KEY not set, returning items without AI processing");
     return items.map((item) => ({
-      ...item,
+      title: item.title,
+      url: item.url,
+      source: item.source,
+      publishedAt: item.publishedAt,
+      imageUrl: item.imageUrl,
+      sourceUrl: item.sourceUrl,
       summary: item.snippet,
       category: "GENERAL",
       entities: [],
@@ -90,7 +99,7 @@ async function processBatch(
         system: `You analyze pharmaceutical industry news. For each article, extract:
 - summary: 2-3 sentence summary focused on business impact
 - category: one of CONTRACT, EXPANSION, REGULATORY, MA_FUNDING, LEADERSHIP, PRODUCT_LAUNCH, TENDER, EVENT, GENERAL
-- entities: company names mentioned (array)
+- entities: ONLY real pharmaceutical/biotech COMPANY names (array). Include manufacturers, distributors, CROs, CMOs. EXCLUDE: regulatory agencies (FDA, EMA, WHO, NIH, CDC), government bodies, news outlets (Reuters, Bloomberg), analytics/research firms (IndexBox, Statista, IQVIA), generic industry terms, country names. If no real company is mentioned, return an empty array — never return "<UNKNOWN>" or placeholder values.
 - countries: countries mentioned (array)
 - sentiment: positive, negative, or neutral (for pharma distributors)
 - relevanceScore: 0-100, how relevant to pharma distribution businesses
@@ -188,6 +197,8 @@ Return valid JSON array. Only extract what's explicitly stated.`,
         url: item.url,
         source: item.source,
         publishedAt: item.publishedAt,
+        imageUrl: item.imageUrl,
+        sourceUrl: item.sourceUrl,
         summary: ai.summary ?? item.snippet,
         category: ai.category ?? "GENERAL",
         entities: ai.entities ?? [],
@@ -210,6 +221,8 @@ function fallbackProcess(item: RawNewsItem): ProcessedNewsItem {
     url: item.url,
     source: item.source,
     publishedAt: item.publishedAt,
+    imageUrl: item.imageUrl,
+    sourceUrl: item.sourceUrl,
     summary: item.snippet,
     category: "GENERAL",
     entities: [],

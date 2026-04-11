@@ -184,12 +184,22 @@ function isGenericEntity(name: string): boolean {
 
   // Common false positives from AI entity extraction
   const generics = new Set([
-    "fda", "ema", "who", "nih", "cdc", "eu", "us", "uk", "uae",
+    // Regulatory agencies
+    "fda", "ema", "who", "nih", "cdc", "mhra", "tga", "pmda", "anvisa", "cfda", "nmpa",
+    "eu", "us", "uk", "uae",
     "united states", "european union", "united kingdom",
     "world health organization", "food and drug administration",
     "ministry of health", "department of health",
     "government", "congress", "parliament", "senate",
-    "reuters", "bloomberg", "cnbc", "bbc",
+    // News & media outlets
+    "reuters", "bloomberg", "cnbc", "bbc", "associated press", "ap news",
+    "fierce pharma", "fiercepharma", "endpoints news", "stat news",
+    "pharma intelligence", "pharmaphorum",
+    // Analytics / research firms (false positives from AI entity extraction)
+    "indexbox", "statista", "iqvia", "globaldata", "evaluate", "grand view research",
+    "mordor intelligence", "fortune business insights", "marketsandmarkets",
+    "coherent market insights", "precedence research", "vantage market research",
+    // Generic terms
     "pharma", "pharmaceutical", "healthcare", "medical",
     "market", "industry", "sector", "report",
   ]);

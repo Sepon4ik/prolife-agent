@@ -109,6 +109,8 @@ export const newsCollect = inngest.createFunction(
               relevanceScore: item.relevanceScore,
               companyId: item.companyId,
               topicId,
+              // Save RSS image immediately if available (no need for backfill)
+              ...(item.imageUrl && { imageUrl: item.imageUrl }),
             },
             update: {
               summary: item.summary,
@@ -119,6 +121,7 @@ export const newsCollect = inngest.createFunction(
               relevanceScore: item.relevanceScore,
               companyId: item.companyId,
               topicId,
+              // Don't overwrite images on update — existing items may already have OG images from backfill
             },
             select: { id: true, createdAt: true, updatedAt: true },
           });
